@@ -13,8 +13,8 @@ This repository contains the complete data and Stata code to reproduce every fig
 |---|---|
 | `code/income_results.do` | Income results: Figures 2, 3, 6, 7, 8; leave-one-out robustness (paper footnote 15) |
 | `code/governance_results.do` | Governance results: Figures 4, 5, Table 2, Appendix Figures A1–A10 |
-| `data/income_panel.dta` | Income panel (Penn World Table 11.0 + covariates), 166 countries, 1950–2023; the do-file subsets to the paper's 15-country, 1984–2023 analysis sample |
-| `data/governance_panel.dta` | Governance panel (V-Dem + covariates), 166 countries, 1950–2023; the do-file subsets to the paper's 13-country, 1984–2023 analysis sample |
+| `data/income_panel.dta` | Income analysis panel (Penn World Table 11.0 + covariates): India and the 14 donor countries, 1984–2023 |
+| `data/governance_panel.dta` | Governance analysis panel (V-Dem + covariates): India and the 12 donor democracies, 1984–2023 |
 
 ## Requirements
 
