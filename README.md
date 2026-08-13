@@ -2,7 +2,7 @@
 
 **Kevin Grier and Robin Grier** (Texas Tech University)
 
-- Working paper: [SSRN link — TODO]
+- Working paper: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338
 - Data companion site: https://rgrier88.github.io/modi-promises/
 
 This repository contains the complete data and Stata code to reproduce every figure and table in the paper. Nothing is hand-edited: all results regenerate from the two do-files below.
@@ -32,7 +32,7 @@ net install synth_runner, from(https://raw.github.com/bquistorff/synth_runner/ma
 
 1. Open either do-file and edit the single `global root` line at the top to point to this repository's folder on your machine.
 2. Run the file. Each is organized in independent parts:
-   - **Part 1 — Estimation** (slow: nested `synth`/`synth_runner` runs; expect [TODO: fill in your observed runtimes] on a modern machine). Saves all estimates to disk in `output/gaps/`.
+   - **Part 1 — Estimation** (slow: nested `synth`/`synth_runner` runs; expect several hours per file). Saves all estimates to disk in `output/gaps/`.
    - **Part 2 — Figures** (fast; runs standalone once Part 1 has completed once).
    - **Part 3** — income: leave-one-out donor robustness; governance: fills Table 2 and exports `Table2_values.xlsx`.
 
@@ -55,15 +55,15 @@ Output folders (`output/gaps/`, `output/figures/`, `output/web/`) are created au
 
 ## Data sources
 
-- **Governance indicators**: Varieties of Democracy (V-Dem), version [TODO: version number]. Coppedge, Michael, et al. [TODO: full V-Dem citation used in the paper].
+- **Governance indicators**: Varieties of Democracy (V-Dem), https://www.v-dem.net
 - **Income and covariates**: Penn World Table 11.0. Feenstra, Robert C., Robert Inklaar and Marcel P. Timmer (2015), "The Next Generation of the Penn World Table," *American Economic Review* 105(10): 3150–3182.
-- [TODO: Gini source citation for the governance covariates]
+- **Gini coefficient**: World Inequality Database, https://wid.world
 
 The `.dta` files in `data/` are the authors' derived analysis panels constructed from these sources; original data remain the property of their providers under their respective terms.
 
 ## Citation
 
-> Grier, Kevin and Robin Grier (2026). "Promises, Promises: Governance and Growth in India under Modi and the BJP." Working paper, Texas Tech University. [SSRN link — TODO]
+> Grier, Kevin and Robin Grier (2026). "Promises, Promises: Governance and Growth in India under Modi and the BJP." Working paper, Texas Tech University. Available at SSRN: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338
 
 ## License
 
