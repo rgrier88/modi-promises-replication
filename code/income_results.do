@@ -1,429 +1,163 @@
 ********************************************************************************
-* income_results.do
-* Replication code for the income results in:
-*   Grier, Kevin and Robin Grier, "Promises, Promises: Governance and Growth
-*   in India under Modi and the BJP."
+* income_results.do -- income results on the rule-based 18-donor pool
 *
-* Produces manuscript Figures 2, 3, 6, 7, and 8, and the leave-one-out donor
-* robustness reported in footnote 15.
+* Three synthetic-control models for real per-capita income (PWT rgdpe/pop):
+*   main     treatment 2014, sample 1984-2023; predictors: rgdppc in 1986,
+*            1991, 1996, 2001, 2006, 2011 and pre-period means of csh_g, hc,
+*            csh_x, csh_i                           -> Table 2, Figure 2
+*   singh    in-time placebo: treatment 2004, sample 1984-2013; same predictors
+*            with 2003 in place of 2006 and 2011    -> Figure 3
+*   alllags  treatment 2014, sample 1984-2023; predictors: rgdppc in every
+*            year 1984-2013, no covariates           -> Figure 4
+* Each model runs synth (point estimate, weights, paths) then synth_runner
+* (standardized yearly placebo p-values), both with nested allopt.
 *
-* Specification: income_panel.dta, outcome rgdppc, 14-donor pool,
-*   sample 1984+, outcome lags 1986-2011, covariates csh_g hc csh_x csh_i.
+* This is the script that produced output/income_results/income_pol18.log
+* (19 Sep 2026), with paths pointed at the repository and CSV exports added.
+* Donor pool: GDP per capita and population relative to the US in 1984; see
+* the paper, Section 3. Poland was the last donor added (18th).
 *
-* Requirements: Stata with the user-written packages synth and synth_runner.
+* Requires: synth and synth_runner. Set $root to the repository folder.
+* Reads data/income_panel.dta; writes output/income_results/.
 *
-* SETUP: set the global `root' below to the path of this replication folder.
-*   All output directories are created automatically.
-*
-* Structure:
-*   PART 1 -- estimation (slow). Saves all estimates to output/gaps.
-*   PART 2 -- figures (fast; runs standalone once PART 1 has completed).
-*   PART 3 -- leave-one-out donor robustness (footnote 15).
-*   Every figure exports twice: PDF -> output/figures, PNG -> output/web.
+* Run time: three synth_runner calls with nested optimization and 17-18
+* placebos each -- expect hours, not minutes. Stata shows the beachball
+* during each call; do not force-quit.
 ********************************************************************************
 
 clear all
-set scheme s1mono
-graph set window fontface "Garamond"
+global root "/Users/ttufmi169d/Dropbox/Modi-Mania/modi-replication"   // <- edit
+global data "$root/data/income_panel.dta"
+global out  "$root/output/income_results"
+capture mkdir "$out"
+capture log close
+log using "$out/income_results.log", replace text
 
-* --- set this one path, then run -------------------------------------------------
-global root "REPLACE-WITH-PATH-TO-THIS-FOLDER"
+global donors "CHN IDN BRA BGD PAK MEX VNM PHL THA TUR EGY KOR ETH ZAF ARG MMR COD POL"
+global covs   "csh_g hc csh_x csh_i"
 
-global data    "$root/data/income_panel.dta"
-global gapdir  "$root/output/gaps"
-global figures "$root/output/figures"
-global web     "$root/output/web"
-
-capture mkdir "$root/output"
-capture mkdir "$gapdir"
-capture mkdir "$figures"
-capture mkdir "$web"
-
-* --- helper: rebuild the income panel (paper spec) ------------------------------
-capture program drop load_master
-program define load_master
+* --- load India + donors, 1984 to endyr ------------------------------------------
+capture program drop load18
+program define load18
+    args endyr
     use "$data", clear
-    gen byte donor_core = inlist(iso3code,"CHN","IDN","BGD","PAK","VNM") ///
-                        | inlist(iso3code,"THA","PHL","EGY","BRA","MEX") ///
-                        | inlist(iso3code,"TUR","ETH","ZAF","MYS")
-    keep if iso3code == "IND" | donor_core == 1
-    keep if year > 1983
+    gen byte keepme = iso3code == "IND"
+    foreach c of global donors {
+        replace keepme = 1 if iso3code == "`c'"
+    }
+    keep if keepme & year >= 1984 & year <= `endyr'
     egen id = group(iso3code)
     tsset id year
 end
 
-* --- helper: save effects + standardized p-values to disk ----------------------
-capture program drop save_pvals
-program define save_pvals
-    args stub trper
-    tempname P
-    matrix `P' = e(pvals_std)
-    local K = colsof(`P')
+* --- data check ------------------------------------------------------------------
+load18 2023
+foreach c in IND $donors {
+    quietly count if iso3code == "`c'"
+    local n = r(N)
+    quietly count if iso3code == "`c'" & ///
+        (rgdppc >= . | csh_g >= . | hc >= . | csh_x >= . | csh_i >= .)
+    if `n' == 0       display as error "`c': not in data"
+    else if r(N) > 0  display as error "`c': `r(N)' country-years with missing data"
+    else              display as text  "`c': ok"
+}
 
-    use "$gapdir/keep_`stub'", clear
+* --- estimate one model, print and save results ----------------------------------
+capture program drop run18
+program define run18
+    args stub trper endyr pred
+
+    * 1. synth: point estimate, weights, paths
+    load18 `endyr'
+    quietly levelsof id if iso3code == "IND", local(tr)
+    synth rgdppc `pred', trunit(`tr') trperiod(`trper') nested allopt ///
+        keep("$out/keep_`stub'") replace
+
+    * 2. synth_runner: standardized yearly placebo p-values
+    load18 `endyr'
+    synth_runner rgdppc `pred', trunit(`tr') trperiod(`trper') nested allopt
+    local jp = e(pval_joint_post_std)
+    local np = e(n_pl_used)
+    local nt = e(n_pl)
+    matrix P = e(pvals_std)
+    local rank = round(`jp' * `np') + 1
+
+    * 3. yearly effects and p-values
+    use "$out/keep_`stub'", clear
+    keep _time _Y_treated _Y_synthetic
+    drop if _time == .
     rename _time year
     gen effect = _Y_treated - _Y_synthetic
-    keep if year >= `trper' & effect < .
-    sort year
-    gen lead = _n                     // 1 = treatment year
-    gen pvals_std = .
-    forvalues j = 1/`K' {
-        quietly replace pvals_std = `P'[1,`j'] in `j'
-    }
-    replace pvals_std = round(pvals_std, .01)
-    keep year lead effect pvals_std
-    save "$gapdir/pvals_`stub'", replace
-end
-
-* --- helper: India + donors "spaghetti" figure, pre-treatment period ------------
-* Paper style: no box, no title (heading lives in the Word file), rotated
-* ytitle, India thick black with black IND label, donors thin gray with gray
-* labels at the final year.
-capture program drop donor_spaghetti
-program define donor_spaghetti
-    syntax , YVar(string) YTit(string) EXportname(string) [XLABopt(string)]
-    load_master
-    local startyr 1984
-    local endyr   2013
-
-    local xl ""
-    if `"`xlabopt'"' != "" local xl `"xlabel(`xlabopt')"'
-
-    local graphcmd ""
-    local graphcmd `graphcmd' ///
-        (line `yvar' year if iso3code=="IND" & inrange(year, `startyr', `endyr'), ///
-            lwidth(thick) lcolor(black))
-    quietly levelsof iso3code if iso3code != "IND", local(donors)
-    foreach c of local donors {
-        local graphcmd `graphcmd' ///
-            (line `yvar' year if iso3code=="`c'" & inrange(year, `startyr', `endyr'), ///
-                lwidth(vthin) lcolor(gs10))
-    }
-
-    twoway `graphcmd' ///
-        (scatter `yvar' year if year==`endyr' & iso3code=="IND", ///
-            msymbol(none) mlabel(iso3code) mlabpos(3) mlabcolor(black)) ///
-        (scatter `yvar' year if year==`endyr' & iso3code!="IND", ///
-            msymbol(none) mlabel(iso3code) mlabpos(3) mlabcolor(gs8)), ///
-        ytitle("`ytit'") ///
-        xtitle("Year") ///
-        `xl' ///
-        legend(off) ///
-        plotregion(style(none)) ///
-        graphregion(color(white))
-    graph export "$figures/`exportname'.pdf", as(pdf) replace
-    graph export "$web/`exportname'.png", width(2400) replace
-end
-
-* --- helper: trends figure (India vs Synthetic India), paper style --------------
-* labyear: year at which the in-graph "India"/"Synthetic India" labels sit;
-*   -1 (default) = automatic (xln + 5); 0 = no labels (placebo figure).
-* Whichever series is higher at labyear gets its label above the line, the
-* other below, offset by 7% of the joint y-range.
-capture program drop trend_fig
-program define trend_fig
-    syntax , STub(string) XLN(real) YTit(string) EXportname(string) ///
-        [FIGTitle(string) LABYear(real -1) XLABopt(string) YLABopt(string)]
-
-    use "$gapdir/keep_`stub'", clear
-    rename _Y_synthetic synth
-    rename _Y_treated India
-    rename _time time
-    keep synth India time
-    drop if India == .
-
-    local topt ""
-    if `"`figtitle'"' != "" local topt `"title("`figtitle'", size(medium))"'
-    local xl ""
-    if `"`xlabopt'"' != "" local xl `"xlabel(`xlabopt')"'
-    local yl ""
-    if `"`ylabopt'"' != "" local yl `"ylabel(`ylabopt')"'
-
-    local tlab ""
-    if `labyear' != 0 {
-        local ly = `labyear'
-        if `ly' == -1 local ly = `xln' + 5
-        quietly summarize India if time == `ly'
-        local yI = r(mean)
-        quietly summarize synth if time == `ly'
-        local yS = r(mean)
-        quietly summarize India
-        local mn = r(min)
-        local mx = r(max)
-        quietly summarize synth
-        if r(min) < `mn' local mn = r(min)
-        if r(max) > `mx' local mx = r(max)
-        local off = .07*(`mx' - `mn')
-        if `yI' >= `yS' {
-            local yIl = `yI' + `off'
-            local ySl = `yS' - `off'
+    gen pre2 = effect^2 if year < `trper'
+    quietly summarize pre2
+    local rmspe = sqrt(r(mean))
+    preserve
+        keep if year >= `trper'
+        gen lead = _n
+        gen pval = .
+        forvalues j = 1/`=colsof(P)' {
+            quietly replace pval = round(P[1,`j'], .01) in `j'
         }
-        else {
-            local yIl = `yI' - `off'
-            local ySl = `yS' + `off'
-        }
-        local tlab `"text(`yIl' `ly' "India", size(medsmall)) text(`ySl' `ly' "Synthetic India", size(medsmall))"'
-    }
+        keep year lead effect pval
+        save "$out/pvals_`stub'", replace
+        export delimited "$out/pvals_`stub'.csv", replace
+        display as result _newline "=== `stub' (18 donors): treatment `trper', 1984-`endyr' ==="
+        display as result "pre-treatment RMSPE = " %6.1f `rmspe' ///
+            "   joint p (std) = " %5.2f `jp' ///
+            "   post/pre ratio: rank `rank' of `=`np'+1'" ///
+            "   placebos used = `np' of `nt'"
+        format effect %8.1f
+        list year effect pval, noobs sep(0)
+    restore
+    * India and synthetic India in levels (Panel A of the figures)
+    rename _Y_treated india
+    rename _Y_synthetic synthetic
+    rename effect gap
+    keep year india synthetic gap
+    export delimited "$out/paths_`stub'.csv", replace
 
-    twoway ///
-        (line India time, lcolor(black) lwidth(medthick)) ///
-        (line synth time, lpattern(dash) lcolor(gs10) lwidth(medthick)), ///
-        `topt' ///
-        xline(`xln', lpattern(dash)) ///
-        xtitle("Year") ///
-        ytitle("`ytit'") ///
-        `xl' `yl' `tlab' ///
-        legend(off) ///
-        plotregion(style(none)) ///
-        graphregion(color(white))
-    graph export "$figures/`exportname'.pdf", as(pdf) replace
-    graph export "$web/`exportname'.png", width(2400) replace
-end
-
-* --- helper: treatment-effect / p-value bars, paper style ------------------------
-capture program drop pval_fig
-program define pval_fig
-    syntax , STub(string) XTit(string) EXportname(string) ///
-        [FIGTitle(string) YLABopt(string)]
-    use "$gapdir/pvals_`stub'", clear
-
-    local topt ""
-    if `"`figtitle'"' != "" local topt `"title("`figtitle'", size(medium))"'
-    local yl ""
-    if `"`ylabopt'"' != "" local yl `"ylabel(`ylabopt')"'
-    quietly summarize lead
-    local kmax = r(max)
-
-    twoway ///
-        (bar effect lead, base(0) barwidth(.5) fcolor(gs11) lcolor(gs8)) ///
-        (scatter effect lead, mlabel(pvals_std) mlabcolor(black) ///
-            msymbol(i) mlabpos(6)), ///
-        `topt' ///
-        xtitle("`xtit'") ///
-        ytitle("Treatment Effect") ///
-        xlabel(1(1)`kmax') ///
-        `yl' ///
-        yline(0, lcolor(black)) ///
-        legend(off) ///
-        plotregion(style(none)) ///
-        graphregion(color(white))
-    graph export "$figures/`exportname'.pdf", as(pdf) replace
-    graph export "$web/`exportname'.png", width(2400) replace
+    * 4. donor weights, named
+    use "$out/keep_`stub'", clear
+    keep _Co_Number _W_Weight
+    drop if _Co_Number == . | _W_Weight < .001
+    rename _Co_Number id
+    tempfile w
+    save `w'
+    load18 `endyr'
+    keep id iso3code
+    duplicates drop
+    merge 1:1 id using `w', nogenerate keep(match)
+    gsort -_W_Weight
+    format _W_Weight %6.3f
+    list iso3code _W_Weight, noobs sep(0)
+    export delimited "$out/weights_`stub'.csv", replace
 end
 
 ********************************************************************************
-* PART 1 -- ESTIMATION (slow)
+* RUN
 ********************************************************************************
 
-tempname jph
-postfile `jph' str16 model double joint_p using "$gapdir/income_joint_pvals.dta", replace
-
-* ---------- (1) MAIN MODEL (paper spec, verbatim) -------------------------------
-load_master
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth rgdppc
-    rgdppc(1986) rgdppc(1991) rgdppc(1996)
-    rgdppc(2001) rgdppc(2006) rgdppc(2011)
-    csh_g hc csh_x csh_i,
-    trunit(`tr') trperiod(2014) nested
-    keep("$gapdir/keep_inc_main") replace ;
-#delimit cr
-
-load_master
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth_runner rgdppc
-    rgdppc(1986) rgdppc(1991) rgdppc(1996)
-    rgdppc(2001) rgdppc(2006) rgdppc(2011)
-    csh_g hc csh_x csh_i,
-    trunit(`tr') trperiod(2014) nested
-    keep("$gapdir/runner_inc_main") replace ;
-#delimit cr
-
-post `jph' ("main") (e(pval_joint_post_std))
-save_pvals inc_main 2014
-
-* ---------- (2) IN-TIME PLACEBO: treatment 2001, sample ends 2010 ---------------
-load_master
-drop if year > 2010
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth rgdppc
-    rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2000)
-    csh_g hc csh_x csh_i,
-    trunit(`tr') trperiod(2001) nested
-    keep("$gapdir/keep_inc_placebo") replace ;
-#delimit cr
-
-load_master
-drop if year > 2010
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth_runner rgdppc
-    rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2000)
-    csh_g hc csh_x csh_i,
-    trunit(`tr') trperiod(2001) nested
-    keep("$gapdir/runner_inc_placebo") replace ;
-#delimit cr
-
-post `jph' ("placebo") (e(pval_joint_post_std))
-save_pvals inc_placebo 2001
-
-* ---------- (3) ALL-LAGS MODEL: every pre-treatment lag, no covariates ----------
-local laglist ""
+local main_pred "rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2001) rgdppc(2006) rgdppc(2011) $covs"
+local lags ""
 forvalues y = 1984/2013 {
-    local laglist `laglist' rgdppc(`y')
+    local lags `lags' rgdppc(`y')
 }
 
-load_master
-quietly levelsof id if iso3code == "IND", local(tr)
+run18 main    2014 2023 "`main_pred'"
+run18 singh   2004 2013 "rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2001) rgdppc(2003) $covs"
+run18 alllags 2014 2023 "`lags'"
 
-#delimit ;
-synth rgdppc
-    `laglist',
-    trunit(`tr') trperiod(2014) nested
-    keep("$gapdir/keep_inc_alllags") replace ;
-#delimit cr
+* --- Table 2: predictor balance for the main model --------------------------------
+* synth's keep() file stores the predictor-balance table in its header rows:
+* _Co_Number, _W_Weight, then _Y_treated/_Y_synthetic by _time. The balance
+* table (India, synthetic India, donor mean) is printed by synth above; the
+* values in Table 2 are read from that printout. The India and synthetic
+* columns can also be recomputed from the weights in weights_main.csv.
 
-load_master
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth_runner rgdppc
-    `laglist',
-    trunit(`tr') trperiod(2014) nested
-    keep("$gapdir/runner_inc_alllags") replace ;
-#delimit cr
-
-post `jph' ("alllags") (e(pval_joint_post_std))
-save_pvals inc_alllags 2014
-
-postclose `jph'
-use "$gapdir/income_joint_pvals.dta", clear
-format joint_p %9.2f
-display as result "Joint post-treatment standardized p-values (income models):"
-list, noobs
-
-********************************************************************************
-* PART 2 -- FIGURES (fast; runs standalone once Part 1 has completed)
-********************************************************************************
-
-* normalize lead from year order: 1 = treatment year (2014).
-foreach s in inc_main inc_placebo inc_alllags {
-    use "$gapdir/pvals_`s'", clear
-    sort year
-    replace lead = _n
-    save "$gapdir/pvals_`s'", replace
-}
-
-* ---------- Figure 2: India and the donor pool, pre-treatment (income) -----------
-donor_spaghetti, yvar(rgdppc) ytit("Real GDP per capita") ///
-    xlabopt("1984(5)2014") exportname(Fig2_donorpool_income)
-
-* ---------- Figure 3: polyarchy, ECONOMIC donor pool ------------------------------
-* (Figure 4, the alternative-pool version, is produced by
-*  governance_results.do.)
-donor_spaghetti, yvar(v2x_polyarchy) ytit("Polyarchy Index") ///
-    xlabopt("1984(5)2014") exportname(Fig3_polyarchy_econpool)
-
-* ---------- Figure 6: main income model -------------------------------------------
-trend_fig, stub(inc_main) xln(2013) ///
-    figtitle("A. Trends in real per-capita income") ///
-    ytit("Real per-capita income") ///
-    xlabopt("1984(6)2020") ylabopt("2000(2000)10000") labyear(2018) ///
-    exportname(Fig6a_income_trends)
-
-pval_fig, stub(inc_main) ///
-    figtitle("B. Treatment effects and p-values") ///
-    xtit("Years since Modi became Prime Minister") ///
-    ylabopt("-1200(200)0") ///
-    exportname(Fig6b_income_pvals)
-
-* ---------- Figure 7: all-lags specification --------------------------------------
-trend_fig, stub(inc_alllags) xln(2013) ///
-    figtitle("A. Trends in real per-capita income") ///
-    ytit("Real per-capita income") ///
-    xlabopt("1986(10)2016") ylabopt("2000(2000)10000") labyear(2018) ///
-    exportname(Fig7a_income_alllags_trends)
-
-pval_fig, stub(inc_alllags) ///
-    figtitle("B. Treatment effects and p-values") ///
-    xtit("Years since Modi became Prime Minister") ///
-    ylabopt("-1000(200)0") ///
-    exportname(Fig7b_income_alllags_pvals)
-
-* ---------- Figure 8: in-time placebo (treatment 2001) ----------------------------
-* No in-graph line labels (labyear(0)), matching the manuscript.
-trend_fig, stub(inc_placebo) xln(2000) ///
-    figtitle("A. Trends in real per-capita income") ///
-    ytit("Real per-capita income") ///
-    xlabopt("1985(5)2010") ylabopt("1000(1000)5000") labyear(0) ///
-    exportname(Fig8a_income_placebo_trends)
-
-pval_fig, stub(inc_placebo) ///
-    figtitle("B. Annual treatment effects and p-values") ///
-    xtit("Years since placebo treatment") ///
-    ylabopt("-1000(200)0") ///
-    exportname(Fig8b_income_placebo_pvals)
-
-
-********************************************************************************
-* PART 3 -- DONOR-POOL ROBUSTNESS (leave-one-out for the two largest donors)
-* Reported in footnote 15. Produced as standalone figures with descriptive
-* baked-in titles (they do not appear in the manuscript).
-********************************************************************************
-
-* ---------- (4) MAIN MODEL WITHOUT ETHIOPIA --------------------------------------
-load_master
-drop if iso3code == "ETH"
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth rgdppc
-    rgdppc(1986) rgdppc(1991) rgdppc(1996)
-    rgdppc(2001) rgdppc(2006) rgdppc(2011)
-    csh_g hc csh_x csh_i,
-    trunit(`tr') trperiod(2014) nested
-    keep("$gapdir/keep_inc_noETH") replace ;
-#delimit cr
-
-load_master
-drop if iso3code == "ETH"
-quietly levelsof id if iso3code == "IND", local(tr)
-
-#delimit ;
-synth_runner rgdppc
-    rgdppc(1986) rgdppc(1991) rgdppc(1996)
-    rgdppc(2001) rgdppc(2006) rgdppc(2011)
-    csh_g hc csh_x csh_i,
-    trunit(`tr') trperiod(2014) nested
-    keep("$gapdir/runner_inc_noETH") replace ;
-#delimit cr
-
-display as result "Joint p-value (standardized), Ethiopia excluded: " %5.2f e(pval_joint_post_std)
-save_pvals inc_noETH 2014
-
-* normalize leads for the robustness pvals as well
-foreach s in inc_noETH {
-    use "$gapdir/pvals_`s'", clear
-    sort year
-    replace lead = _n
-    save "$gapdir/pvals_`s'", replace
-}
-
-* ---------- figures (titled; standalone handouts, not manuscript figures) --------
-
-trend_fig, stub(inc_noETH) xln(2013) ///
-    figtitle("Trends in real per-capita income (Ethiopia excluded)") ///
-    ytit("Real per-capita income") labyear(2018) ///
-    exportname(Robust_income_noETH_trends)
-
-pval_fig, stub(inc_noETH) ///
-    figtitle("Annual treatment effects and p-values (Ethiopia excluded)") ///
-    xtit("Years since Modi became Prime Minister") ///
-    exportname(Robust_income_noETH_pvals)
+display as result _newline "Expected (income_pol18.log, 19 Sep 2026):" ///
+    _newline "  main:    2023 effect -1095.5, p 0.06, pre-RMSPE 60.0, joint p 0.06, 17 of 17 placebos;" ///
+    " weights ETH .363 BGD .313 CHN .262 PAK .056 KOR .006" ///
+    _newline "  singh:   2013 effect -475.1, p 0.28, pre-RMSPE 32.7, joint p 0.33, 18 of 18 placebos" ///
+    _newline "  alllags: 2023 effect -592.7, p 0.06, pre-RMSPE 47.4, joint p 0.06, 17 of 17 placebos;" ///
+    " weights ETH .471 VNM .205 CHN .153 BGD .079 PAK .054 MMR .023 KOR .015"
+log close
