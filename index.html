@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Populism in Power – Governance and Income in Modi’s India</title>
+<meta name="description" content="How India fared under Modi against the India that would have existed without him: ten governance indicators, real income per person, and the evidence behind each number.">
+
+<!-- ==== SOCIAL PREVIEW (link cards on X/Twitter, Bluesky, LinkedIn, WhatsApp) ==== -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Populism in Power: Governance and Income in Modi’s India">
+<meta property="og:description" content="Modi promised better governance and faster growth. Measured against the India that would have existed without him, nine of ten governance indicators are significantly worse and income per person is about $1,100 lower.">
+<meta property="og:url" content="https://rgrier88.github.io/modi-promises/">
+<meta property="og:image" content="https://rgrier88.github.io/modi-promises/figures/social-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Populism in Power: Governance and Income in Modi’s India">
+<meta name="twitter:description" content="Modi promised better governance and faster growth. Against the India that would have existed without him, nine of ten governance indicators are significantly worse and income per person is about $1,100 lower.">
+<meta name="twitter:image" content="https://rgrier88.github.io/modi-promises/figures/social-card.png"><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PROMISES, PROMISES – audit-ledger design
+   Palette: printed working paper + red ink for the shortfalls.
+   Type: EB Garamond (matches the figures' Garamond) + Plex Mono
+   for anything that smells like econometric output.
+   ============================================================ */
+:root{
+  --paper:#FFFEFB;
+  --ink:#121008;
+  --faint:#4E4A42;
+  --rule:#DCD7CB;
+  --wash:#F2EFE6;
+  --red:#A31621;
+  --red-soft:#F7E9E9;
+  --maxw:1080px;
+  --prose:50rem;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:"EB Garamond",Georgia,serif;
+  font-size:1.5rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration-color:var(--red);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{color:var(--red)}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+img{max-width:100%;height:auto;display:block}
+
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 1.25rem}
+.prose{max-width:var(--prose);margin-left:auto;margin-right:auto}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:.9rem;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--red);margin:0 0 1rem;
+}
+section{padding:4.5rem 0}
+.rule-top{border-top:1px solid var(--rule)}
+
+/* ---------- masthead ---------- */
+.masthead{border-bottom:1px solid var(--rule);padding:.7rem 0;font-size:.8rem}
+.masthead .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.masthead span{font-family:"IBM Plex Mono",monospace;letter-spacing:.06em;color:var(--faint)}
+
+/* ---------- hero ---------- */
+.hero{padding:5.5rem 0 4rem;border-bottom:1px solid var(--rule)}
+.hero h1{
+  font-size:clamp(3rem,8vw,5.6rem);line-height:.98;margin:.2rem 0 1.2rem;
+  font-weight:500;font-style:italic;letter-spacing:-.01em;
+}
+.hero .deck{font-size:clamp(1.45rem,2.8vw,1.85rem);line-height:1.45;max-width:44rem;margin:0 0 .8rem}
+.hero .authors{color:var(--faint);font-size:1.2rem;margin:0 0 2.2rem}
+.statstrip{display:flex;gap:.75rem;flex-wrap:wrap;margin:0 0 2.2rem;padding:0;list-style:none}
+.statstrip li{
+  font-family:"IBM Plex Mono",monospace;font-size:1rem;letter-spacing:.02em;
+  border:1px solid var(--ink);padding:.6rem .85rem;background:var(--paper);
+}
+.statstrip b{color:var(--red);font-weight:600}
+.btns{display:flex;gap:.9rem;flex-wrap:wrap}
+.btn{
+  font-family:"IBM Plex Mono",monospace;font-size:.85rem;letter-spacing:.04em;
+  padding:.75rem 1.2rem;border:1.5px solid var(--ink);text-decoration:none;
+  background:var(--ink);color:var(--paper);transition:background .15s,color .15s;
+}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:hover{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ---------- epigraph ---------- */
+.epigraph{background:var(--wash);border-bottom:1px solid var(--rule);padding:3.2rem 0}
+.epigraph blockquote{
+  margin:0;font-style:italic;font-weight:500;font-size:1.8rem;line-height:1.42;color:var(--ink);
+  border-left:4px solid var(--red);padding-left:1.2rem;
+}
+.epigraph cite{display:block;margin-top:1rem;font-style:normal;font-weight:600;font-family:"IBM Plex Mono",monospace;font-size:.9rem;color:var(--ink)}
+.duel{display:grid;grid-template-columns:1fr auto 1fr;gap:2.4rem;align-items:center}
+.duel .vs{
+  font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.9rem;letter-spacing:.1em;
+  color:var(--red);border:1.5px solid var(--red);border-radius:50%;
+  width:3.2rem;height:3.2rem;display:flex;align-items:center;justify-content:center;flex:none;
+}
+.duel-kicker{
+  margin:2.2rem 0 0;text-align:center;font-family:"IBM Plex Mono",monospace;
+  font-size:.88rem;letter-spacing:.06em;color:var(--ink);
+}
+@media(max-width:760px){
+  .duel{grid-template-columns:1fr}
+  .duel .vs{margin:0 auto}
+}
+
+/* ---------- headings ---------- */
+h2{font-size:clamp(2.1rem,4.2vw,3rem);line-height:1.12;font-weight:500;margin:0 0 1.4rem}
+h3{font-size:1.55rem;font-weight:600;margin:2.2rem 0 .6rem}
+p{margin:0 0 1.15rem}
+
+/* ---------- the 2x2 ---------- */
+.matrix{max-width:44rem;margin:2.5rem auto;border-collapse:collapse;width:100%}
+.matrix caption{caption-side:top;text-align:left;font-family:"IBM Plex Mono",monospace;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding-bottom:.7rem}
+.matrix th,.matrix td{border:1px solid var(--ink);padding:1.1rem 1rem;text-align:center}
+.matrix thead th,.matrix tbody th{border:none;font-family:"IBM Plex Mono",monospace;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500}
+.matrix td .cell-title{font-size:1.25rem;font-weight:600;display:block}
+.matrix td .cell-sub{font-size:1.1rem;color:var(--faint)}
+.matrix td.verdict{position:relative;background:var(--red-soft)}
+.stamp{
+  position:absolute;inset:auto;top:50%;left:50%;
+  transform:translate(-50%,-50%) rotate(-8deg);
+  font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.8rem;letter-spacing:.14em;
+  color:var(--red);border:2px solid var(--red);padding:.35rem .7rem;background:rgba(252,251,247,.85);
+  text-transform:uppercase;white-space:nowrap;
+}
+
+/* ---------- figures ---------- */
+figure{margin:2.4rem 0}
+figure img{border:1px solid var(--rule);background:#fff}
+figcaption{font-size:1.2rem;color:var(--faint);margin-top:.7rem;line-height:1.5}
+figcaption .fig-no{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--red);margin-right:.5rem}
+.fig-pair{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:820px){.fig-pair{grid-template-columns:1fr}}
+
+/* pending governance panels */
+.panel-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem;margin:2.2rem 0}
+@media(max-width:640px){.panel-grid{grid-template-columns:1fr}}
+.pending{
+  aspect-ratio:4/3;border:1.5px dashed var(--rule);background:var(--wash);
+  display:flex;align-items:center;justify-content:center;text-align:center;padding:1rem;
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.06em;color:var(--faint);
+}
+
+/* ---------- the ledger (Table 2) ---------- */
+.ledger-wrap{overflow-x:auto;margin:2.4rem 0}
+.ledger{border-collapse:collapse;width:100%;min-width:620px}
+.ledger caption{caption-side:top;text-align:left;font-family:"IBM Plex Mono",monospace;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding-bottom:.7rem}
+.ledger th{
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:500;color:var(--faint);text-align:right;padding:.5rem .75rem;border-bottom:1.5px solid var(--ink);
+}
+.ledger th:first-child{text-align:left}
+.ledger td{padding:.65rem .75rem;font-size:1.3rem;border-bottom:1px solid var(--rule);text-align:right;font-variant-numeric:tabular-nums}
+.ledger td:first-child{text-align:left}
+.ledger .num{font-family:"IBM Plex Mono",monospace;font-size:1.12rem}
+.ledger .worse{color:var(--red);font-weight:600}
+.pchip{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.78rem;
+  border:1px solid var(--red);color:var(--red);padding:.1rem .45rem;font-weight:600;
+}
+.ledger tfoot td{border-bottom:none;color:var(--faint);font-size:.95rem;padding-top:.9rem;text-align:left}
+
+/* ---------- recipe box ---------- */
+.recipe{
+  border:1px solid var(--ink);padding:1.5rem 1.7rem;margin:2.2rem 0;
+  background:var(--ink);color:#F3F1EA;
+}
+.recipe h4{margin:0 0 .65rem;font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#E8837B;font-weight:600}
+.recipe p{margin:0;color:#F3F1EA;font-size:1.35rem}
+
+/* ---------- pull stat ---------- */
+.pull{
+  border-left:4px solid var(--red);padding:.4rem 0 .4rem 1.4rem;margin:2.2rem 0;
+  font-size:1.65rem;line-height:1.4;font-style:italic;
+}
+
+/* ---------- researcher section ---------- */
+details{border:1px solid var(--rule);margin:0 0 1rem;background:#fff}
+summary{
+  cursor:pointer;padding:1.05rem 1.3rem;font-weight:600;font-size:1.3rem;list-style:none;
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;
+}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:"IBM Plex Mono",monospace;color:var(--red);font-size:1.1rem}
+details[open] summary::after{content:"–"}
+details .inner{padding:0 1.3rem 1.3rem;border-top:1px solid var(--rule)}
+
+/* ---------- replication strip ---------- */
+.repl{background:var(--ink);color:var(--paper);padding:3.5rem 0}
+.repl h2{color:var(--paper)}
+.repl p{color:#CFCBC2;max-width:44rem}
+.repl .btn{border-color:var(--paper);background:var(--paper);color:var(--ink)}
+.repl .btn.ghost{background:transparent;color:var(--paper)}
+.repl .btn:hover{background:var(--red);border-color:var(--red);color:#fff}
+
+/* ---------- footer ---------- */
+footer{padding:3.5rem 0 4.5rem;border-top:1px solid var(--rule)}
+.authors-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin:1.5rem 0 2.5rem}
+@media(max-width:640px){.authors-grid{grid-template-columns:1fr}}
+.author h3{margin:0 0 .2rem}
+.author p{margin:0 0 .5rem;color:var(--faint);font-size:1.15rem}
+.author .links{font-family:"IBM Plex Mono",monospace;font-size:.8rem}
+.cite-block{
+  font-family:"IBM Plex Mono",monospace;font-size:.82rem;line-height:1.7;color:var(--faint);
+  border:1px dashed var(--rule);padding:1.2rem 1.4rem;background:var(--wash);
+}
+.footnote{font-size:1.1rem;color:var(--faint)}
+.panel-grid img{border:1px solid var(--rule);background:#fff}
+.balance{border-collapse:collapse;margin:1.6rem 0;font-size:1.25rem}
+.balance th,.balance td{padding:.35rem .9rem;border-bottom:1px solid var(--rule);text-align:right;font-variant-numeric:tabular-nums}
+.balance th{font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500}
+.balance td:first-child,.balance th:first-child{text-align:left}
+.fig-trio{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:820px){.fig-trio{grid-template-columns:1fr}}
+.hook{border-left:4px solid var(--red);background:var(--red-soft);padding:1.1rem 1.4rem;margin:0 0 2.2rem;max-width:46rem}
+.hook p{margin:0;font-size:clamp(1.3rem,2.4vw,1.55rem);line-height:1.45}
+</style>
+</head>
+<body>
+
+<!-- ======================= MASTHEAD ======================= -->
+<div class="masthead">
+  <div class="wrap">
+    <span>A companion to the working paper</span>
+    <span>Grier &amp; Grier · Texas Tech University · October 2026</span>
+  </div>
+</div>
+
+<!-- ======================= HERO ======================= -->
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Governance and income in Modi’s India</p>
+    <h1>Populism in Power</h1>
+    <p class="deck">In 2014 Narendra Modi promised India cleaner government and faster growth. We can’t go back to 2014 and see what would have happened without Modi. But we can make an educated guess. We built a statistical version of India using countries that had followed similar paths for thirty years. Then we compared the two.</p>
+    <p class="authors">Kevin Grier &amp; Robin Grier · Texas Tech University</p>
+    <ul class="statstrip">
+      <li>10 governance measures · <b>9 significantly worse</b></li>
+      <li>income, 2023: <b>about $1,100 per person below</b> the counterfactual</li>
+      <li>in 7 of 10 governance measures, India’s decline is <b>larger than every placebo</b></li>
+    </ul>
+    <div class="hook">
+      <p>When the paper went online in August it made a splash. <a href="https://thewire.in/politics/india-is-much-poorer-and-far-less-free-under-modi-than-it-would-have-been-without-him-report">The Wire</a>, <a href="https://theprint.in/opinion/modi-india-governance-economic-growth-study/3018487/">ThePrint</a> and others reported it; within a day the Ministry of Information and Broadcasting sent The Wire a rejoinder calling the study “fanciful,” “rigged” and “a phantom country,” and we were asked to respond. We did. <a href="#exchange">The exchange is in section 07.</a></p>
+    </div>
+    <div class="btns">
+      <a class="btn" href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338">Read the paper (SSRN)</a>
+      <a class="btn ghost" href="https://github.com/rgrier88/modi-promises-replication">Data &amp; code (GitHub)</a>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= EPIGRAPH ======================= -->
+<section class="epigraph">
+  <div class="wrap">
+    <div class="duel">
+      <blockquote>
+        “PM Modi has done an unbelievable job in India. I know the liberal Press here, they beat the hell out of him when he’s taken 400 million people out of poverty.”
+        <cite>– Jamie Dimon, CEO of JPMorgan Chase, 2024</cite>
+      </blockquote>
+      <div class="vs">vs.</div>
+      <blockquote>
+        “The Indian government is one of the most appalling in the world.”
+        <cite>– Amartya Sen, Nobel Laureate in Economics, 2023</cite>
+      </blockquote>
+    </div>
+    <p class="duel-kicker">Same country, same decade. They can’t both be right.</p>
+  </div>
+</section>
+
+<!-- ======================= 01 PROMISES ======================= -->
+<section id="promises">
+  <div class="wrap prose">
+    <p class="eyebrow">01 · The promises</p>
+    <h2>“Give BJP just 60 months.”</h2>
+    <p>Modi’s 2014 campaign had one slogan above the rest: <em>achhe din aane wale hain</em> (अच्छे दिन आने वाले हैं), good days are coming. The good days had two parts. One was prosperity: “You gave Congress 60 years, give BJP just 60 months. We will change India’s future and bring about development in 60 months.” The other was cleaner, more effective government, summed up as “minimum government, maximum governance.”</p>
+    <p>Modi didn’t promise more of the same. He promised something better. So that’s the question we set out to answer: did India actually do better under Modi than we would have expected without him?</p>
+    <p>A decade on, the report card could have come back four ways: richer and freer, richer but less free, freer but poorer, or neither.</p>
+    <p>Here is what we found.</p>
+  </div>
+</section>
+
+<!-- ======================= 02 THE MEASURING STICK ======================= -->
+<section id="method" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">02 · The measuring stick</p>
+    <h2>Compared to what?</h2>
+    <p>Nobody can rerun the last decade without Modi. The next best thing is a synthetic India: a weighted blend of other countries, with the weights chosen so that the blend tracks India’s actual path over the thirty years before Modi took office, 1984 to 2013. If a blend reproduces India for thirty years, its path after 2014 is a reasonable estimate of where India was headed. The test is then the one Modi set for himself: did his India do better than that?</p>
+    <p>Income and governance get separate pools of eighteen comparison countries each, chosen by explicit rules on population, income and democracy scores rather than by hand. Significance comes from placebo tests: every comparison country gets the same “treatment,” and we ask whether India’s divergence is larger than theirs. The rules, the lists and the estimators are in the <a href="#researchers">researcher section</a> and the paper.</p>
+  </div>
+</section>
+
+<!-- ======================= 03 GOVERNANCE ======================= -->
+<section id="governance" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">03 · Maximum governance?</p>
+    <h2>Nine of ten measures of democracy got significantly worse</h2>
+    <p>Ten indicators from the Varieties of Democracy project, each plotted as India minus its synthetic counterpart. A line along zero would mean Modi’s India performed exactly as the no-Modi India would have. The dashed line marks 2013, his last year out of office.</p>
+  </div>
+
+  <div class="wrap">
+    <div class="panel-grid">
+      <img src="figures/panel_v2x_polyarchy.png" alt="Polyarchy: India minus synthetic India, 1984–2023">
+      <img src="figures/panel_v2x_libdem.png" alt="Liberal democracy: India minus synthetic India">
+      <img src="figures/panel_v2xlg_legcon.png" alt="Legislative constraints: India minus synthetic India">
+      <img src="figures/panel_v2x_jucon.png" alt="Judicial constraints: India minus synthetic India">
+      <img src="figures/panel_v2x_corr.png" alt="Political corruption: India minus synthetic India">
+      <img src="figures/panel_v2xcl_rol.png" alt="Equality before the law: India minus synthetic India">
+      <img src="figures/panel_v2x_frassoc_thick.png" alt="Freedom of association: India minus synthetic India">
+      <img src="figures/panel_v2x_freexp_altinf.png" alt="Freedom of expression: India minus synthetic India">
+      <img src="figures/panel_v2clrelig.png" alt="Freedom of religion: India minus synthetic India">
+      <img src="figures/panel_v2xeg_eqprotec.png" alt="Equal protection: India minus synthetic India">
+    </div>
+  </div>
+
+  <div class="wrap prose">
+    <p>The pattern is the same almost everywhere: a flat line for thirty years, then a drop starting in 2014 that does not reverse. Equality before the law and equal protection improve briefly before falling. Legislative constraints on the executive is the one measure that recovers; it falls sharply and then returns to roughly its counterfactual by 2023. The counterfactuals themselves barely move after 2014; the change is all on India’s side.</p>
+    <p>In seven of the ten cases India’s divergence is larger than that of every placebo country (a p-value of 0.00). For corruption and equal protection it is the second largest of nineteen (0.05), and for freedom of religion the third largest (0.11).</p>
+
+    <div class="ledger-wrap">
+      <table class="ledger">
+        <caption>The governance ledger · 2023 gap, India minus synthetic India</caption>
+        <thead>
+          <tr><th>Indicator</th><th>Gap</th><th>As % of India’s 2013 level</th><th>Rank among 19</th><th>p</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Polyarchy (electoral democracy)</td><td class="num worse">−0.352</td><td class="num worse">−54.2%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Liberal democracy</td><td class="num worse">−0.285</td><td class="num worse">−54.6%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Legislative constraints on the executive</td><td class="num">+0.030</td><td class="num">+3.6%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Judicial constraints on the executive</td><td class="num worse">−0.068</td><td class="num worse">−8.2%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Political corruption (higher = more corrupt)</td><td class="num worse">+0.302</td><td class="num worse">+52.0%</td><td class="num">2</td><td><span class="pchip">0.05</span></td></tr>
+          <tr><td>Equality before the law</td><td class="num worse">−0.222</td><td class="num worse">−30.5%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Freedom of association</td><td class="num worse">−0.221</td><td class="num worse">−28.4%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Freedom of expression</td><td class="num worse">−0.387</td><td class="num worse">−44.6%</td><td class="num">1</td><td><span class="pchip">0.00</span></td></tr>
+          <tr><td>Freedom of religion</td><td class="num worse">−1.117</td><td class="num">—</td><td class="num">3</td><td><span class="pchip">0.11</span></td></tr>
+          <tr><td>Equal protection</td><td class="num worse">−0.118</td><td class="num worse">−16.3%</td><td class="num">2</td><td><span class="pchip">0.05</span></td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="5">Gaps are in the units of each index. All run from 0 to 1 except freedom of religion, which is on an interval scale, so a percentage of its 2013 level is not meaningful. Rank is India’s place among the nineteen countries (India plus eighteen placebos) ordered by the ratio of post- to pre-treatment fit; p is the share of the nineteen with a larger ratio. Legislative constraints ranks first because its 2014–2022 decline was large even though it had recovered by 2023.</td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <p class="pull">Modi made fighting corruption a central part of his campaign. Yet by 2023, India scored substantially worse on V-Dem’s corruption index than our synthetic India. Not exactly the result his supporters were promised.</p>
+
+    <h3>Beyond the indices</h3>
+    <p>The V-Dem indices are not the only evidence. Committee review of bills, investigations of opposition politicians, religious hate crimes, foreign-funding registrations for civil-society groups, and government blocking of online content all moved in the same direction after 2014. We have put that material, with its sources, on <a href="evidence.html">a separate page</a>.</p>
+  </div>
+</section>
+
+<!-- ======================= 04 ECONOMY ======================= -->
+<section id="economy" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">04 · The 60-month economy</p>
+    <h2>Was it at least worth it for the growth?</h2>
+    <p>This is the bargain many observers assumed was on offer: give up some democracy, get development. So here is the economic half of the report card, real income per person in India against the India without Modi.</p>
+
+    <div class="recipe">
+      <h4>The recipe for synthetic India (income)</h4>
+      <p>36% Ethiopia · 31% Bangladesh · 26% China · 6% Pakistan · 1% South Korea. An odd-sounding mix, until you see that it matches India’s income path for thirty years with an average miss of $58 a year, about 1% of India’s 2013 income.</p>
+    </div>
+
+    <figure>
+      <img src="figures/Figure2A_income_india_synthetic.png" alt="Real per-capita income, India and synthetic India, 1984–2023">
+      <figcaption><span class="fig-no">Fig 2-A</span>For thirty years, the two Indias moved almost in lockstep. After 2014, the real India fell behind. And the gap kept growing.</figcaption>
+    </figure>
+    <figure>
+      <img src="figures/Figure2B_income_effects_pvalues.png" alt="Annual treatment effects on income with placebo p-values">
+      <figcaption><span class="fig-no">Fig 2-B</span>The annual shortfall in 2017 international dollars per person, with placebo p-values. It starts near −$400 and passes −$1,000.</figcaption>
+    </figure>
+
+    <p>By 2023 the average Indian earns about $1,100 a year less than our estimate of what they would have earned without Modi, roughly 11% of what their income would have been. In five of the ten years India’s shortfall is larger than every placebo we can construct (p = 0.00); in the other five it is beaten by exactly one (p = 0.06).</p>
+    <p>The statistical evidence is stronger in some years than others. But here’s the important point: Modi didn’t promise to match India’s previous performance. He promised to beat it. We find no evidence that he did. The 60 months came and went, and so did 120.</p>
+    <p>But what about Covid? Or demonetization? Fair questions. The income gap was already there before Covid, and demonetization was Modi’s own policy. It’s part of his record, not something we should set aside when judging it. And if India’s post-2015 GDP revisions overstate its growth, as several critics argue, our estimate is a floor, not a ceiling.</p>
+  </div>
+</section>
+
+<!-- ======================= 05 WHY ======================= -->
+<section id="why" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">05 · The elections</p>
+    <h2>So why does he keep winning?</h2>
+    <p>There’s an obvious question here. If India has performed so poorly relative to our estimates, why does Modi keep winning elections? We can’t answer that question with these data. But one possibility is that some groups have benefited from his policies, or feel that their interests and values are better represented, even if the country as a whole has fallen behind. Economic performance isn’t the only thing voters care about. And what benefits the country as a whole isn’t necessarily what matters most to every voter. The paper sketches a simple model along these lines.</p>
+  </div>
+</section>
+
+<!-- ======================= 06 VERDICT ======================= -->
+<section id="verdict" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">06 · The verdict</p>
+    <h2>Which India did we get?</h2>
+    <p>Less democracy, but more prosperity? That might have been one way to defend Modi’s record. But that’s not what we find. Compared with our synthetic India, the real India ended up with weaker governance and lower income. So much for the promised economic miracle.</p>
+
+    <table class="matrix">
+      <thead>
+        <tr><th></th><th colspan="2">Governance</th></tr>
+        <tr><th></th><th>Improves</th><th>Declines</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Economy<br>Improves</th>
+          <td><span class="cell-title">The promise kept</span></td>
+          <td><span class="cell-title">The strongman bargain</span></td>
+        </tr>
+        <tr>
+          <th>Economy<br>Declines</th>
+          <td><span class="cell-title">Freer but poorer</span></td>
+          <td class="verdict"><span class="cell-title">Neither</span><span class="cell-sub">India · 2014–2023</span><span class="stamp">India, 2014–2023</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>We are not making a case for the Congress Party. It was not great. But on nine of the ten governance measures we study, and on income, Modi and the BJP did worse than the India they inherited was on course to do.</p>
+    <p><em>Achhe din aane wale hain</em>, the campaign promised: good days are coming. The data reply <em>bure din aa gaye</em> (बुरे दिन आ गए): the bad days have come.</p>
+  </div>
+</section>
+
+<!-- ======================= 07 THE EXCHANGE ======================= -->
+<section id="exchange" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">07 · The response</p>
+    <h2>What the government said, and what we said back</h2>
+    <p>On 25 August 2026 <a href="https://thewire.in/politics/india-is-much-poorer-and-far-less-free-under-modi-than-it-would-have-been-without-him-report">The Wire</a> reported the paper’s findings. The next day a Senior Advisor at the Ministry of Information and Broadcasting sent the editors a rejoinder headed “Not ethical journalism.” The Wire published it with our reply. <a href="https://thewire.in/political-economy/debate-modi-govt-official-questions-methodology-data-of-broken-promises-study-authors-respond">The full exchange is here.</a></p>
+    <p>The rejoinder made three claims: that the donor pool was “cherry-picked” and a “complete” pool would flip the result; that V-Dem is “an opaque index of subjective judgements by anonymous experts”; and that a long list of achievements since 2014 shows the economy has been transformed.</p>
+    <p>Our reply, in brief. The donor pool was chosen once, before we saw any result, and the inventor of the method is explicit that adding poor matches to a pool is “a recipe for bias,” not a robustness check. V-Dem is the standard governance data in political science and the opposite of opaque: it publishes its procedures, its coder-level data and its uncertainty estimates, and it scores our donor countries by the same process it scores India. And nobody disputes that India has grown or built things since 2014; the question is whether it did better than the thirty years before would have predicted, and a list of accomplishments does not answer that. One footnote: Freedom House scores India on “free private expression of personal views without fear of surveillance or retribution” at 4 of 4 in 2012 and 2 of 4 in 2025. Given the tone of the exchange, we can see why.</p>
+    <p>The critique was aimed at the August version of the paper, with hand-chosen pools of fourteen and twelve donors. The version on this page uses rule-based pools of eighteen, and the results are the same.</p>
+  </div>
+</section>
+
+<!-- ======================= 07 RESEARCHERS ======================= -->
+<section id="researchers" class="rule-top">
+  <div class="wrap prose">
+    <p class="eyebrow">08 · For researchers</p>
+    <h2>How we tested it</h2>
+    <p>Open any of these for the details, or go to the <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338">paper</a> and the replication files.</p>
+
+    <details>
+      <summary>How the donor pools were chosen</summary>
+      <div class="inner">
+        <p>India has far better political institutions than most countries at its income level, so no single pool works for both outcomes. The income pool is every country with at least 30 million people in 1984 and income per person below half the US level in 1984: Argentina, Bangladesh, Brazil, China, the Democratic Republic of Congo, Egypt, Ethiopia, Indonesia, South Korea, Mexico, Myanmar, Pakistan, the Philippines, Poland, South Africa, Thailand, Turkey and Vietnam. The governance pool is every country with income below half the US level in 2013, at least 10 million people, and an average EIU democracy score of 6 or more over 2010–13: Argentina, Benin, Brazil, Colombia, the Dominican Republic, Ghana, Greece, Indonesia, Malaysia, Mexico, Peru, the Philippines, Poland, Romania, South Africa, Sri Lanka, Thailand and Zambia. Chile also qualifies but is dropped because V-Dem has no legislative-constraints score for it under Pinochet in 1984–89. Neither list was adjusted after the fact.</p>
+        <p>For the governance pool the partially pooled estimator gives Greece 35%, Argentina 20%, Malaysia 13% and Sri Lanka 11% of the weight on average across the ten outcomes; ten of the eighteen donors get under 1.5% each. For polyarchy on its own the synthetic India is 49% Argentina, 16% Greece and 14% Sri Lanka, with a pre-treatment RMSPE of 0.015.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Is the model just unstable out of sample? (In-time placebo)</summary>
+      <div class="inner">
+        <p>Pretend the treatment began in 2004, when Manmohan Singh became Prime Minister, end the sample in 2013, and rerun everything. If the method were manufacturing gaps, it would manufacture one here. It does not: the yearly p-values run from 0.22 to 0.94 and the joint p-value is 0.33. India under a fake treatment looks like a typical member of the donor pool.</p>
+        <div class="fig-pair">
+          <figure><img src="figures/Figure3A_income_intime_placebo_2004.png" alt="In-time placebo: India and synthetic India with treatment assigned to 2004"><figcaption><span class="fig-no">Fig 3-A</span></figcaption></figure>
+          <figure><img src="figures/Figure3B_income_intime_placebo_2004_pvalues.png" alt="In-time placebo: yearly effects and p-values"><figcaption><span class="fig-no">Fig 3-B</span></figcaption></figure>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Cherry-picked predictors? (All-lags specification)</summary>
+      <div class="inner">
+        <p>Researchers can tilt synthetic control results through their choice of matching variables. Following the advice of that literature, we re-estimate using every pre-treatment year of income and nothing else. The effect is smaller, −$593 rather than −$1,095 by 2023, but has the same sign and the same pattern of significance.</p>
+        <div class="fig-pair">
+          <figure><img src="figures/Figure4A_income_alllags.png" alt="All-lags specification: India and synthetic India"><figcaption><span class="fig-no">Fig 4-A</span></figcaption></figure>
+          <figure><img src="figures/Figure4B_income_alllags_pvalues.png" alt="All-lags specification: yearly effects and p-values"><figcaption><span class="fig-no">Fig 4-B</span></figcaption></figure>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>“But 36% Ethiopia?” (Leave-one-out)</summary>
+      <div class="inner">
+        <p>Against our better judgment, we also report a leave-one-out exercise: the all-lags model rerun without Bangladesh, then without China, then without Ethiopia. The three countries are in the pool because they meet the same rule as everyone else, and they get weight because their income paths help reproduce India’s. Dropping Bangladesh or China barely moves the result (2023 effects of −$461 and −$498). Dropping Ethiopia makes the pre-treatment fit worse and the estimated shortfall larger, −$851 in 2023, the most extreme in the placebo distribution. Objecting to Ethiopia makes Modi look worse, not better.</p>
+        <figure><img src="figures/Figure5_income_alllags_leave_one_out_levels.png" alt="Leave-one-out: India and four synthetic Indias"><figcaption><span class="fig-no">Fig 5</span>India and the all-lags synthetic India with the full pool and with Bangladesh, China or Ethiopia left out.</figcaption></figure>
+      </div>
+    </details>
+
+    <details>
+      <summary>One governance estimate at a time (Appendix B)</summary>
+      <div class="inner">
+        <p>The headline governance results pool the ten outcomes, letting them share information about which donors resemble India. Appendix B repeats the exercise the old-fashioned way, a separate synthetic control for each outcome with Gini, government consumption and human capital as added predictors. The 2023 gaps are very close to the pooled ones (polyarchy −0.377 against −0.352, for example) and the joint p-values are 0.00 for seven of the ten.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>What’s in the replication files</summary>
+      <div class="inner">
+        <p>The replication repository contains the two analysis panels trimmed to the variables the paper uses, the four Stata scripts, the logs from the runs behind the paper, the CSVs the figure scripts read, and every figure. The README maps each table and figure to the script, the log and the numbers to check. The hand-collected figures in the governance section come with a verification list giving the document, page and sentence for each number.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ======================= 08 MATERIALS ======================= -->
+<section class="repl" id="materials">
+  <div class="wrap">
+    <p class="eyebrow">09 · Materials</p>
+    <h2>Paper, data, and code</h2>
+    <p>Every figure and number on this page comes from the working paper and its replication files. The data, the Stata and Python code, and the logs are posted in full.</p>
+    <div class="btns">
+      <a class="btn" href="https://github.com/rgrier88/modi-promises-replication">Replication files (GitHub)</a>
+      <a class="btn ghost" href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338">Working paper (SSRN)</a>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FOOTER ======================= -->
+<footer>
+  <div class="wrap">
+    <p class="eyebrow">The authors</p>
+    <div class="authors-grid">
+      <div class="author">
+        <h3>Kevin Grier</h3>
+        <p>Professor, Department of Political Science, Texas Tech University</p>
+        <p class="links"><a href="https://www.kevinbgrier.com">kevinbgrier.com</a> · <a href="https://scholar.google.com/citations?user=EXWXZs8AAAAJ&amp;hl=en&amp;oi=ao">Google Scholar</a></p>
+      </div>
+      <div class="author">
+        <h3>Robin Grier</h3>
+        <p>Professor, Department of Agricultural &amp; Applied Economics, Texas Tech University</p>
+        <p class="links"><a href="https://www.robinmgrier.com">robinmgrier.com</a> · <a href="https://scholar.google.com/citations?user=Vj4BIcwAAAAJ&amp;hl=en&amp;oi=ao">Google Scholar</a></p>
+      </div>
+    </div>
+    <div class="cite-block">
+      Grier, Kevin and Robin Grier (2026). “Populism in Power: Governance and Income in Modi’s India.” Working paper, Texas Tech University. Available at SSRN: <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338">https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7248338</a>
+    </div>
+    <p class="footnote" style="margin-top:1.5rem">Governance data: Varieties of Democracy (V-Dem). Income data: Penn World Table 11.0. Estimation: synthetic control with placebo inference (synth and synth_runner in Stata) and partially pooled synthetic control (ppsynth). Descriptive figures: PRS Legislative Research, The Indian Express, Hate Crime Watch, Ministry of Home Affairs, The Hindu, World Bank. Quotations of Narendra Modi are from the 2014 BJP campaign, as documented in the paper.</p>
+  </div>
+</footer>
+
+</body>
+</html>
