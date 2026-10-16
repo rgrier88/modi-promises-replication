@@ -1,0 +1,2667 @@
+--------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/governance_results.log
+  log type:  text
+ opened on:  18 Sep 2026, 12:03:44
+
+. 
+. global donors "ARG BRA COL GHA IDN MYS MEX PER PHL ZAF LKA BEN DOM GRC POL ROU THA ZMB"
+
+. global covs   "gini csh_g hc"
+
+. 
+. local outcomesA v2x_polyarchy v2x_libdem v2x_corr v2xcl_rol v2x_frassoc_thick ///
+>                 v2x_freexp_altinf v2clrelig v2xeg_eqprotec
+
+. local outcomesB v2xlg_legcon v2x_jucon
+
+. 
+. * display names, Table 2 names, axis specs and file slugs (from the paper)
+. local y_v2x_polyarchy     "Polyarchy Index"
+
+. local y_v2x_libdem        "Liberal Democracy Index"
+
+. local y_v2xlg_legcon      "Legislative constraints on the executive"
+
+. local y_v2x_jucon         "Judicial constraints"
+
+. local y_v2x_corr          "Political Corruption Index"
+
+. local y_v2xcl_rol         "Rule of Law"
+
+. local y_v2x_frassoc_thick "Freedom of Association"
+
+. local y_v2x_freexp_altinf "Freedom of Expression"
+
+. local y_v2clrelig         "Freedom of Religion"
+
+. local y_v2xeg_eqprotec    "Equal Rights Protection Index"
+
+. 
+. local n_v2x_polyarchy     "Polyarchy"
+
+. local n_v2x_libdem        "Liberal democracy"
+
+. local n_v2xlg_legcon      "Legislative constraints"
+
+. local n_v2x_jucon         "Judicial constraints"
+
+. local n_v2x_corr          "Political corruption"
+
+. local n_v2xcl_rol         "Equality before the law"
+
+. local n_v2x_frassoc_thick "Freedom of association"
+
+. local n_v2x_freexp_altinf "Freedom of expression"
+
+. local n_v2clrelig         "Freedom of religion"
+
+. local n_v2xeg_eqprotec    "Equal protection"
+
+. 
+. local xl_v2x_polyarchy     "1984(10)2024"
+
+. local xl_v2x_libdem        "1984(10)2024"
+
+. local xl_v2xlg_legcon      "1991(5)2021"
+
+. local xl_v2x_jucon         "1991(5)2021"
+
+. local xl_v2x_corr          "1984(5)2024"
+
+. local xl_v2xcl_rol         "1984(6)2020"
+
+. local xl_v2x_frassoc_thick "1984(10)2024"
+
+. local xl_v2x_freexp_altinf "1984(5)2019"
+
+. local xl_v2clrelig         "1984(10)2024"
+
+. local xl_v2xeg_eqprotec    "1984(10)2024"
+
+. 
+. local f_v2x_polyarchy     "polyarchy"
+
+. local f_v2x_libdem        "libdem"
+
+. local f_v2xlg_legcon      "legcon"
+
+. local f_v2x_jucon         "jucon"
+
+. local f_v2x_corr          "corruption"
+
+. local f_v2xcl_rol         "eqlaw"
+
+. local f_v2x_frassoc_thick "frassoc"
+
+. local f_v2x_freexp_altinf "freexp"
+
+. local f_v2clrelig         "freerelig"
+
+. local f_v2xeg_eqprotec    "eqprotect"
+
+. 
+. * --- load India + donors, dropping donors with the outcome missing anywhere ---------
+. capture program drop load24
+
+. program define load24
+  1.     args v startyr
+  2.     use "$data", clear
+  3.     gen byte keepme = iso3code == "IND"
+  4.     foreach c of global donors {
+  5.         replace keepme = 1 if iso3code == "`c'"
+  6.     }
+  7.     keep if keepme & year >= `startyr' & year <= 2023
+  8.     gen byte miss = `v' >= .
+  9.     bysort iso3code: egen anymiss = max(miss)
+ 10.     quietly levelsof iso3code if anymiss & iso3code != "IND", local(dropped) clean
+ 11.     if "`dropped'" != "" display as error "`v': dropped for missing outcome in some sample year: `dropped'"
+ 12.     drop if anymiss & iso3code != "IND"
+ 13.     drop miss anymiss
+ 14.     egen id = group(iso3code)
+ 15.     tsset id year
+ 16. end
+
+. 
+. * --- summary table collector -------------------------------------------------------
+. tempname T
+
+. postfile `T' str32 indicator str16 v double(pre_rmspe eff_2014 eff_2023 joint_p n_placebos) ///
+>     using "$out/table2_values.dta", replace
+
+. 
+. * --- one outcome ------------------------------------------------------------------------
+. capture program drop run24
+
+. program define run24
+  1.     args v startyr lags ytit name slug xl
+  2. 
+.     display as result _newline(2) "==================== `v' (`ytit'), sample `startyr'-2023 ===================="
+  3. 
+.     load24 `v' `startyr'
+  4.     quietly levelsof id if iso3code == "IND", local(tr)
+  5.     synth `v' `lags' $covs, trunit(`tr') trperiod(2014) nested allopt ///
+>         keep("$out/keep_`v'") replace
+  6. 
+.     load24 `v' `startyr'
+  7.     synth_runner `v' `lags' $covs, trunit(`tr') trperiod(2014) nested allopt
+  8.     local jp = e(pval_joint_post_std)
+  9.     local np = e(n_pl_used)
+ 10.     local nt = e(n_pl)
+ 11.     matrix P = e(pvals_std)
+ 12. 
+.     * annual effects + p-values
+.     use "$out/keep_`v'", clear
+ 13.     keep _time _Y_treated _Y_synthetic
+ 14.     drop if _time == .
+ 15.     rename _time year
+ 16.     gen effect = _Y_treated - _Y_synthetic
+ 17.     gen pre2 = effect^2 if year < 2014
+ 18.     quietly summarize pre2
+ 19.     local rmspe = sqrt(r(mean))
+ 20.     keep if year >= 2014
+ 21.     gen lead = _n
+ 22.     gen pval = .
+ 23.     forvalues j = 1/`=colsof(P)' {
+ 24.         quietly replace pval = round(P[1,`j'], .01) in `j'
+ 25.     }
+ 26.     quietly summarize effect if year == 2014
+ 27.     local e14 = r(mean)
+ 28.     quietly summarize effect if year == 2023
+ 29.     local e23 = r(mean)
+ 30.     keep year lead effect pval
+ 31.     save "$out/pvals_`v'", replace
+ 32. 
+.     display as result "pre-treatment RMSPE = " %7.4f `rmspe' ///
+>         "   joint p (std) = " %5.2f `jp' "   placebos used = `np' of `nt'"
+ 33.     format effect %8.3f
+ 34.     list year effect pval, noobs sep(0)
+ 35.     post $T ("`name'") ("`v'") (`rmspe') (`e14') (`e23') (`jp') (`np')
+ 36. 
+.     * named weights
+.     use "$out/keep_`v'", clear
+ 37.     keep _Co_Number _W_Weight
+ 38.     drop if _Co_Number == . | _W_Weight < .001
+ 39.     rename _Co_Number id
+ 40.     tempfile w
+ 41.     save `w'
+ 42.     load24 `v' `startyr'
+ 43.     keep id iso3code
+ 44.     duplicates drop
+ 45.     merge 1:1 id using `w', nogenerate keep(match)
+ 46.     gsort -_W_Weight
+ 47.     format _W_Weight %6.3f
+ 48.     list iso3code _W_Weight, noobs sep(0)
+ 49. 
+.     * figures, paper style
+.     use "$out/keep_`v'", clear
+ 50.     drop if _time == .
+ 51.     twoway (line _Y_treated _time, lcolor(black) lwidth(medthick)) ///
+>            (line _Y_synthetic _time, lpattern(dash) lcolor(gs10) lwidth(medthick)), ///
+>         title("A. Trends in `ytit'", size(medium)) ///
+>         xline(2013, lpattern(dash)) ///
+>         xtitle("Year") ytitle("`ytit'") xlabel(`xl') ///
+>         legend(order(1 "India" 2 "Synthetic India") rows(1) size(small) region(style(none))) ///
+>         plotregion(style(none)) graphregion(color(white))
+ 52.     graph export "$out/Fig_`slug'_trends.pdf", as(pdf) replace
+ 53. 
+.     use "$out/pvals_`v'", clear
+ 54.     quietly summarize lead
+ 55.     twoway (bar effect lead, base(0) barwidth(.5) fcolor(gs11) lcolor(gs8)) ///
+>            (scatter effect lead, mlabel(pval) mlabcolor(black) msymbol(i) mlabpos(6)), ///
+>         title("B. Treatment effects and p-values", size(medium)) ///
+>         xtitle("Years since Modi became Prime Minister") ytitle("Treatment Effect") ///
+>         xlabel(1(1)`r(max)') yline(0, lcolor(black)) legend(off) ///
+>         plotregion(style(none)) graphregion(color(white))
+ 56.     graph export "$out/Fig_`slug'_pvals.pdf", as(pdf) replace
+ 57. end
+
+. 
+. ********************************************************************************
+. * RUN
+. ********************************************************************************
+. 
+. global T `T'
+
+. foreach v of local outcomesA {
+  2.     run24 `v' 1984 "`v'(1986) `v'(1991) `v'(1996) `v'(2001) `v'(2006) `v'(2011)" ///
+>         "`y_`v''" "`n_`v''" "`f_`v''" "`xl_`v''"
+  3. }
+
+
+==================== v2x_polyarchy (Polyarchy Index), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2x_polyarchy
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2x_polyarchy(1986) v2x_polyarchy(1991) v2x_polyarchy(1996) v2x_polyarchy(2001)
+                              v2x_polyarchy(2006) v2x_polyarchy(2011) gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0137064 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .696
+        2 |        .103
+        3 |         .03
+        4 |           0
+        5 |           0
+        6 |           0
+        7 |           0
+        8 |           0
+       10 |        .072
+       11 |           0
+       12 |        .056
+       13 |        .004
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |        .039
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+           v2x_polyarchy(1986) |      .668    .658377 
+           v2x_polyarchy(1991) |      .713    .709507 
+           v2x_polyarchy(1996) |      .741    .740789 
+           v2x_polyarchy(2001) |      .735    .741526 
+           v2x_polyarchy(2006) |      .721    .703715 
+           v2x_polyarchy(2011) |      .671    .678076 
+                          gini |  49.39497   46.49048 
+                         csh_g |  .1419144   .1418569 
+                            hc |   1.70224   2.479443 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.................| 73.00s elapsed. 
+
+Conducting inference: 5 steps, and 18 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |  -.082442   .2222222          0 
+          c2 |  -.161356   .0555556          0 
+          c3 |  -.175305   .1666667          0 
+          c4 |  -.209751   .1111111          0 
+          c5 |  -.232366   .0555556          0 
+          c6 |  -.263564   .0555556          0 
+          c7 |  -.310233   .0555556          0 
+          c8 |  -.301765   .0555556          0 
+          c9 |  -.351175   .0555556          0 
+         c10 |  -.376952          0          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2x_polyarchy.dta saved
+pre-treatment RMSPE =  0.0137   joint p (std) =  0.00   placebos used = 18 of 18
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -0.082      0 |
+  | 2015   -0.161      0 |
+  | 2016   -0.175      0 |
+  | 2017   -0.210      0 |
+  | 2018   -0.232      0 |
+  | 2019   -0.264      0 |
+  | 2020   -0.310      0 |
+  | 2021   -0.302      0 |
+  | 2022   -0.351      0 |
+  | 2023   -0.377      0 |
+  +----------------------+
+(33 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 7  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ARG      0.696 |
+  |      BEN      0.103 |
+  |      LKA      0.072 |
+  |      MYS      0.056 |
+  |      ZMB      0.039 |
+  |      BRA      0.030 |
+  |      PER      0.004 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_polyarchy_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_polyarchy_pvals.pdf saved as PDF format
+
+
+==================== v2x_libdem (Liberal Democracy Index), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2x_libdem
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2x_libdem(1986) v2x_libdem(1991) v2x_libdem(1996) v2x_libdem(2001) v2x_libdem(2006)
+                              v2x_libdem(2011) gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0117513 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .651
+        2 |        .134
+        3 |        .073
+        4 |        .014
+        5 |           0
+        6 |           0
+        7 |           0
+        8 |           0
+       10 |        .128
+       11 |           0
+       12 |           0
+       13 |           0
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+              v2x_libdem(1986) |      .521    .514289 
+              v2x_libdem(1991) |      .561    .549552 
+              v2x_libdem(1996) |      .588    .582827 
+              v2x_libdem(2001) |      .584    .604721 
+              v2x_libdem(2006) |      .569    .565004 
+              v2x_libdem(2011) |      .532     .53381 
+                          gini |  49.39497   46.81529 
+                         csh_g |  .1419144   .1419597 
+                            hc |   1.70224   2.441755 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.................| 87.00s elapsed. 
+
+Conducting inference: 5 steps, and 18 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |    -.0633   .3333333          0 
+          c2 |  -.151839   .1666667          0 
+          c3 |  -.182925   .1111111          0 
+          c4 |   -.21673   .1666667          0 
+          c5 |  -.223792   .0555556          0 
+          c6 |  -.225098   .0555556          0 
+          c7 |  -.253228   .0555556          0 
+          c8 |  -.241356   .0555556          0 
+          c9 |  -.276538          0          0 
+         c10 |   -.33463          0          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2x_libdem.dta saved
+pre-treatment RMSPE =  0.0117   joint p (std) =  0.00   placebos used = 18 of 18
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -0.063      0 |
+  | 2015   -0.152      0 |
+  | 2016   -0.183      0 |
+  | 2017   -0.217      0 |
+  | 2018   -0.224      0 |
+  | 2019   -0.225      0 |
+  | 2020   -0.253      0 |
+  | 2021   -0.241      0 |
+  | 2022   -0.277      0 |
+  | 2023   -0.335      0 |
+  +----------------------+
+(35 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 5  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ARG      0.651 |
+  |      BEN      0.134 |
+  |      LKA      0.128 |
+  |      BRA      0.073 |
+  |      COL      0.014 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_libdem_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_libdem_pvals.pdf saved as PDF format
+
+
+==================== v2x_corr (Political Corruption Index), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2x_corr
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2x_corr(1986) v2x_corr(1991) v2x_corr(1996) v2x_corr(2001) v2x_corr(2006) v2x_corr(2011) gini
+                              csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0194694 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .001
+        2 |        .432
+        3 |        .003
+        4 |        .003
+        5 |           0
+        6 |        .002
+        7 |        .003
+        8 |        .052
+       10 |        .347
+       11 |        .002
+       12 |        .008
+       13 |        .001
+       14 |        .002
+       15 |        .027
+       16 |        .036
+       17 |        .003
+       18 |        .002
+       19 |        .077
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+                v2x_corr(1986) |      .395    .395906 
+                v2x_corr(1991) |      .497    .505162 
+                v2x_corr(1996) |      .551    .551866 
+                v2x_corr(2001) |      .551    .544287 
+                v2x_corr(2006) |      .551    .553122 
+                v2x_corr(2011) |      .582    .582159 
+                          gini |  49.39497   50.75493 
+                         csh_g |  .1419144   .1559867 
+                            hc |   1.70224   2.058928 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.......x.....x...| 1.95m elapsed. 
+
+Conducting inference: 5 steps, and 16 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |   .035661      .4375        .25 
+          c2 |   .117375      .0625          0 
+          c3 |   .185837          0          0 
+          c4 |   .208825          0          0 
+          c5 |   .177349      .0625      .0625 
+          c6 |    .17397       .125      .0625 
+          c7 |   .265224      .0625      .0625 
+          c8 |    .28442      .0625          0 
+          c9 |    .32436          0          0 
+         c10 |   .322049          0          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2x_corr.dta saved
+pre-treatment RMSPE =  0.0191   joint p (std) =  0.00   placebos used = 16 of 16
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014    0.036    .25 |
+  | 2015    0.117      0 |
+  | 2016    0.186      0 |
+  | 2017    0.209      0 |
+  | 2018    0.177    .06 |
+  | 2019    0.174    .06 |
+  | 2020    0.265    .06 |
+  | 2021    0.284      0 |
+  | 2022    0.324      0 |
+  | 2023    0.322      0 |
+  +----------------------+
+(23 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                17  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      BEN      0.432 |
+  |      LKA      0.347 |
+  |      ZMB      0.077 |
+  |      IDN      0.052 |
+  |      ROU      0.036 |
+  |      POL      0.027 |
+  |      MYS      0.008 |
+  |      COL      0.003 |
+  |      BRA      0.003 |
+  |      THA      0.003 |
+  |      GRC      0.003 |
+  |      ZAF      0.002 |
+  |      GHA      0.002 |
+  |      PHL      0.002 |
+  |      MEX      0.002 |
+  |      PER      0.001 |
+  |      ARG      0.001 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_corruption_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_corruption_pvals.pdf saved as PDF format
+
+
+==================== v2xcl_rol (Rule of Law), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2xcl_rol
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2xcl_rol(1986) v2xcl_rol(1991) v2xcl_rol(1996) v2xcl_rol(2001) v2xcl_rol(2006) v2xcl_rol(2011)
+                              gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |   .008941 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .332
+        2 |           0
+        3 |           0
+        4 |        .067
+        5 |           0
+        6 |           0
+        7 |           0
+        8 |           0
+       10 |        .041
+       11 |        .243
+       12 |        .244
+       13 |           0
+       14 |        .072
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+               v2xcl_rol(1986) |      .668    .660845 
+               v2xcl_rol(1991) |      .679    .670109 
+               v2xcl_rol(1996) |      .692    .693288 
+               v2xcl_rol(2001) |      .697    .696051 
+               v2xcl_rol(2006) |      .685    .685266 
+               v2xcl_rol(2011) |      .699    .697575 
+                          gini |  49.39497   47.61726 
+                         csh_g |  .1419144   .1418345 
+                            hc |   1.70224    2.49476 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.................| 1.85m elapsed. 
+
+Conducting inference: 5 steps, and 18 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |   .008715   .8333333   .3333333 
+          c2 |  -.022119   .8333333   .0555556 
+          c3 |  -.021003   .7777778   .1666667 
+          c4 |  -.051073   .5555556   .0555556 
+          c5 |  -.072883   .3888889   .0555556 
+          c6 |  -.091493   .3333333   .0555556 
+          c7 |  -.116923   .1666667          0 
+          c8 |  -.081376         .5   .0555556 
+          c9 |  -.121987   .2222222          0 
+         c10 |  -.186213   .0555556          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2xcl_rol.dta saved
+pre-treatment RMSPE =  0.0090   joint p (std) =  0.06   placebos used = 18 of 18
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014    0.009    .33 |
+  | 2015   -0.022    .06 |
+  | 2016   -0.021    .17 |
+  | 2017   -0.051    .06 |
+  | 2018   -0.073    .06 |
+  | 2019   -0.091    .06 |
+  | 2020   -0.117      0 |
+  | 2021   -0.081    .06 |
+  | 2022   -0.122      0 |
+  | 2023   -0.186      0 |
+  +----------------------+
+(34 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 6  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ARG      0.332 |
+  |      MYS      0.244 |
+  |      MEX      0.243 |
+  |      PHL      0.072 |
+  |      COL      0.067 |
+  |      LKA      0.041 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_eqlaw_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_eqlaw_pvals.pdf saved as PDF format
+
+
+==================== v2x_frassoc_thick (Freedom of Association), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2x_frassoc_thick
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2x_frassoc_thick(1986) v2x_frassoc_thick(1991) v2x_frassoc_thick(1996) v2x_frassoc_thick(2001)
+                              v2x_frassoc_thick(2006) v2x_frassoc_thick(2011) gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0166224 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .396
+        2 |           0
+        3 |           0
+        4 |           0
+        5 |        .185
+        6 |           0
+        7 |           0
+        8 |           0
+       10 |         .38
+       11 |           0
+       12 |           0
+       13 |        .039
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+       v2x_frassoc_thick(1986) |      .805    .793143 
+       v2x_frassoc_thick(1991) |      .807    .800625 
+       v2x_frassoc_thick(1996) |       .81    .812584 
+       v2x_frassoc_thick(2001) |      .796      .8242 
+       v2x_frassoc_thick(2006) |      .773    .783074 
+       v2x_frassoc_thick(2011) |      .787    .761791 
+                          gini |  49.39497   48.36303 
+                         csh_g |  .1419144   .1466799 
+                            hc |   1.70224   2.571626 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.................| 80.00s elapsed. 
+
+Conducting inference: 5 steps, and 18 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |  -.007534   .8333333   .6111111 
+          c2 |  -.087304   .2777778   .0555556 
+          c3 |  -.088266   .2777778   .0555556 
+          c4 |  -.120217   .2222222   .0555556 
+          c5 |  -.141835   .1666667          0 
+          c6 |  -.177888   .1666667          0 
+          c7 |  -.177407   .2777778          0 
+          c8 |  -.178883   .2777778   .0555556 
+          c9 |  -.222691   .1111111          0 
+         c10 |  -.229126   .0555556          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2x_frassoc_thick.dta saved
+pre-treatment RMSPE =  0.0166   joint p (std) =  0.00   placebos used = 18 of 18
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -0.008    .61 |
+  | 2015   -0.087    .06 |
+  | 2016   -0.088    .06 |
+  | 2017   -0.120    .06 |
+  | 2018   -0.142      0 |
+  | 2019   -0.178      0 |
+  | 2020   -0.177      0 |
+  | 2021   -0.179    .06 |
+  | 2022   -0.223      0 |
+  | 2023   -0.229      0 |
+  +----------------------+
+(36 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 4  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ARG      0.396 |
+  |      LKA      0.380 |
+  |      DOM      0.185 |
+  |      PER      0.039 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_frassoc_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_frassoc_pvals.pdf saved as PDF format
+
+
+==================== v2x_freexp_altinf (Freedom of Expression), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2x_freexp_altinf
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2x_freexp_altinf(1986) v2x_freexp_altinf(1991) v2x_freexp_altinf(1996) v2x_freexp_altinf(2001)
+                              v2x_freexp_altinf(2006) v2x_freexp_altinf(2011) gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0063887 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .189
+        2 |           0
+        3 |           0
+        4 |        .079
+        5 |           0
+        6 |           0
+        7 |        .623
+        8 |           0
+       10 |        .022
+       11 |           0
+       12 |        .044
+       13 |           0
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |        .016
+       19 |        .028
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+       v2x_freexp_altinf(1986) |      .856    .856023 
+       v2x_freexp_altinf(1991) |      .867    .869863 
+       v2x_freexp_altinf(1996) |      .897    .890803 
+       v2x_freexp_altinf(2001) |      .885    .897258 
+       v2x_freexp_altinf(2006) |      .889    .885295 
+       v2x_freexp_altinf(2011) |      .889    .892717 
+                          gini |  49.39497   40.32656 
+                         csh_g |  .1419144   .1751049 
+                            hc |   1.70224   2.614105 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+......x..........| 69.00s elapsed. 
+
+Conducting inference: 5 steps, and 17 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |  -.069279   .4705882   .0588235 
+          c2 |  -.211306   .1764706          0 
+          c3 |  -.252037   .1764706          0 
+          c4 |  -.289936   .1764706          0 
+          c5 |  -.315501   .1176471          0 
+          c6 |  -.333646          0          0 
+          c7 |  -.351591          0          0 
+          c8 |  -.328602          0          0 
+          c9 |   -.37587          0          0 
+         c10 |  -.401167          0          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2x_freexp_altinf.dta saved
+pre-treatment RMSPE =  0.0064   joint p (std) =  0.00   placebos used = 17 of 17
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -0.069    .06 |
+  | 2015   -0.211      0 |
+  | 2016   -0.252      0 |
+  | 2017   -0.290      0 |
+  | 2018   -0.316      0 |
+  | 2019   -0.334      0 |
+  | 2020   -0.352      0 |
+  | 2021   -0.329      0 |
+  | 2022   -0.376      0 |
+  | 2023   -0.401      0 |
+  +----------------------+
+(33 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 7  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      GRC      0.623 |
+  |      ARG      0.189 |
+  |      COL      0.079 |
+  |      MYS      0.044 |
+  |      ZMB      0.028 |
+  |      LKA      0.022 |
+  |      ZAF      0.016 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_freexp_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_freexp_pvals.pdf saved as PDF format
+
+
+==================== v2clrelig (Freedom of Religion), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2clrelig
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2clrelig(1986) v2clrelig(1991) v2clrelig(1996) v2clrelig(2001) v2clrelig(2006) v2clrelig(2011)
+                              gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |   .106625 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |           0
+        2 |           0
+        3 |           0
+        4 |           0
+        5 |        .689
+        6 |           0
+        7 |           0
+        8 |           0
+       10 |           0
+       11 |           0
+       12 |        .242
+       13 |           0
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |        .069
+       18 |           0
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+               v2clrelig(1986) |     1.003    .837034 
+               v2clrelig(1991) |      .842    .825097 
+               v2clrelig(1996) |      .842    .825097 
+               v2clrelig(2001) |      .652    .825097 
+               v2clrelig(2006) |      .919    .957045 
+               v2clrelig(2011) |      .919    .925149 
+                          gini |  49.39497   48.04978 
+                         csh_g |  .1419144   .1384699 
+                            hc |   1.70224   2.225192 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+..........x......| 1.72m elapsed. 
+
+Conducting inference: 5 steps, and 17 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |  -.579706   .1176471          0 
+          c2 |  -.877706   .0588235   .0588235 
+          c3 |  -.773706   .0588235   .0588235 
+          c4 |  -.937387   .0588235          0 
+          c5 |  -.942217   .1176471          0 
+          c6 | -1.141083   .1764706          0 
+          c7 | -1.039249   .1764706   .0588235 
+          c8 |  -.958249   .1764706   .1176471 
+          c9 |  -.825249   .2352941   .1176471 
+         c10 | -1.128841          0          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2clrelig.dta saved
+pre-treatment RMSPE =  0.1066   joint p (std) =  0.00   placebos used = 17 of 17
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -0.580      0 |
+  | 2015   -0.878    .06 |
+  | 2016   -0.774    .06 |
+  | 2017   -0.937      0 |
+  | 2018   -0.942      0 |
+  | 2019   -1.141      0 |
+  | 2020   -1.039    .06 |
+  | 2021   -0.958    .12 |
+  | 2022   -0.825    .12 |
+  | 2023   -1.129      0 |
+  +----------------------+
+(37 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 3  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      DOM      0.689 |
+  |      MYS      0.242 |
+  |      THA      0.069 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_freerelig_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_freerelig_pvals.pdf saved as PDF format
+
+
+==================== v2xeg_eqprotec (Equal Rights Protection Index), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2xeg_eqprotec
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2xeg_eqprotec(1986) v2xeg_eqprotec(1991) v2xeg_eqprotec(1996) v2xeg_eqprotec(2001)
+                              v2xeg_eqprotec(2006) v2xeg_eqprotec(2011) gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0127374 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |         .68
+        2 |           0
+        3 |           0
+        4 |           0
+        5 |        .059
+        6 |           0
+        7 |           0
+        8 |        .044
+       10 |           0
+       11 |           0
+       12 |        .111
+       13 |           0
+       14 |        .024
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |        .083
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+          v2xeg_eqprotec(1986) |      .713    .713209 
+          v2xeg_eqprotec(1991) |      .716    .716263 
+          v2xeg_eqprotec(1996) |      .716    .716431 
+          v2xeg_eqprotec(2001) |      .704    .697041 
+          v2xeg_eqprotec(2006) |      .697    .699165 
+          v2xeg_eqprotec(2011) |      .702    .703685 
+                          gini |  49.39497   45.79554 
+                         csh_g |  .1419144   .1423028 
+                            hc |   1.70224   2.531871 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+...............x.| 64.00s elapsed. 
+
+Conducting inference: 5 steps, and 17 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |   .030042   .6470588   .1176471 
+          c2 |   .003278          1   .8235294 
+          c3 |   -.05531   .1764706   .0588235 
+          c4 |  -.018036   .7647059   .3529412 
+          c5 |  -.075389   .4117647   .0588235 
+          c6 |   -.08602   .5294118   .0588235 
+          c7 |  -.020855   .8823529   .7058824 
+          c8 |  -.005652          1          1 
+          c9 |  -.072876   .7058824   .1764706 
+         c10 |  -.167479   .3529412          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2xeg_eqprotec.dta saved
+pre-treatment RMSPE =  0.0125   joint p (std) =  0.06   placebos used = 17 of 17
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014    0.030    .12 |
+  | 2015    0.003    .82 |
+  | 2016   -0.055    .06 |
+  | 2017   -0.018    .35 |
+  | 2018   -0.075    .06 |
+  | 2019   -0.086    .06 |
+  | 2020   -0.021    .71 |
+  | 2021   -0.006      1 |
+  | 2022   -0.073    .18 |
+  | 2023   -0.167      0 |
+  +----------------------+
+(34 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 6  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ARG      0.680 |
+  |      MYS      0.111 |
+  |      ZMB      0.083 |
+  |      DOM      0.059 |
+  |      IDN      0.044 |
+  |      PHL      0.024 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_eqprotect_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_eqprotect_pvals.pdf saved as PDF format
+
+. foreach v of local outcomesB {
+  2.     run24 `v' 1984 "`v'(1986) `v'(1991) `v'(1996) `v'(2001) `v'(2006) `v'(2011)" ///
+>         "`y_`v''" "`n_`v''" "`f_`v''" "`xl_`v''"
+  3. }
+
+
+==================== v2xlg_legcon (Legislative constraints on the executive), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2xlg_legcon
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2xlg_legcon(1986) v2xlg_legcon(1991) v2xlg_legcon(1996) v2xlg_legcon(2001) v2xlg_legcon(2006)
+                              v2xlg_legcon(2011) gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0076039 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |           0
+        2 |           0
+        3 |           0
+        4 |           0
+        5 |           0
+        6 |           0
+        7 |        .899
+        8 |           0
+       10 |        .099
+       11 |           0
+       12 |           0
+       13 |        .002
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+            v2xlg_legcon(1986) |      .842    .835868 
+            v2xlg_legcon(1991) |      .842    .836304 
+            v2xlg_legcon(1996) |      .842    .850617 
+            v2xlg_legcon(2001) |      .842     .85249 
+            v2xlg_legcon(2006) |      .842    .844287 
+            v2xlg_legcon(2011) |       .85    .854247 
+                          gini |  49.39497   36.48437 
+                         csh_g |  .1419144   .1951742 
+                            hc |   1.70224    2.70042 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+......x..........| 2.10m elapsed. 
+
+Conducting inference: 5 steps, and 17 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |  -.026359   .6470588          0 
+          c2 |  -.099631   .2352941          0 
+          c3 |  -.110366   .4117647          0 
+          c4 |  -.133297   .1764706          0 
+          c5 |  -.171869   .1764706          0 
+          c6 |  -.183806   .2352941          0 
+          c7 |  -.123779   .4117647          0 
+          c8 |  -.007025          1   .6470588 
+          c9 |  -.001096   .9411765   .8823529 
+         c10 |   .029872          1   .4117647 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2xlg_legcon.dta saved
+pre-treatment RMSPE =  0.0076   joint p (std) =  0.00   placebos used = 17 of 17
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -0.026      0 |
+  | 2015   -0.100      0 |
+  | 2016   -0.110      0 |
+  | 2017   -0.133      0 |
+  | 2018   -0.172      0 |
+  | 2019   -0.184      0 |
+  | 2020   -0.124      0 |
+  | 2021   -0.007    .65 |
+  | 2022   -0.001    .88 |
+  | 2023    0.030    .41 |
+  +----------------------+
+(37 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 3  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      GRC      0.899 |
+  |      LKA      0.099 |
+  |      PER      0.002 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_legcon_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_legcon_pvals.pdf saved as PDF format
+
+
+==================== v2x_jucon (Judicial constraints), sample 1984-2023 ====================
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: v2x_jucon
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: v2x_jucon(1986) v2x_jucon(1991) v2x_jucon(1996) v2x_jucon(2001) v2x_jucon(2006) v2x_jucon(2011)
+                              gini csh_g hc
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  .0065108 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |        .009
+        2 |           0
+        3 |           0
+        4 |        .032
+        5 |           0
+        6 |           0
+        7 |        .637
+        8 |           0
+       10 |        .027
+       11 |           0
+       12 |        .043
+       13 |           0
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |        .219
+       18 |        .033
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+               v2x_jucon(1986) |      .802    .800593 
+               v2x_jucon(1991) |      .802    .803106 
+               v2x_jucon(1996) |      .819    .818619 
+               v2x_jucon(2001) |      .819    .819681 
+               v2x_jucon(2006) |      .819     .81824 
+               v2x_jucon(2011) |      .822    .821793 
+                          gini |  49.39497   39.45811 
+                         csh_g |  .1419144   .1903824 
+                            hc |   1.70224   2.550219 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.................| 1.82m elapsed. 
+
+Conducting inference: 5 steps, and 18 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 |   .018297   .7777778   .0555556 
+          c2 |   .021895   .8888889   .1666667 
+          c3 |   .022567   .9444444   .2222222 
+          c4 |   .000751          1          1 
+          c5 |  -.023623   .9444444   .2777778 
+          c6 |  -.034937   .8888889   .1666667 
+          c7 |  -.030808   .8888889   .2222222 
+          c8 |  -.037433   .7222222   .1666667 
+          c9 |   .003506          1   .7777778 
+         c10 |  -.064117   .6666667          0 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/pvals_v2x_jucon.dta saved
+pre-treatment RMSPE =  0.0065   joint p (std) =  0.17   placebos used = 18 of 18
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014    0.018    .06 |
+  | 2015    0.022    .17 |
+  | 2016    0.023    .22 |
+  | 2017    0.001      1 |
+  | 2018   -0.024    .28 |
+  | 2019   -0.035    .17 |
+  | 2020   -0.031    .22 |
+  | 2021   -0.037    .17 |
+  | 2022    0.004    .78 |
+  | 2023   -0.064      0 |
+  +----------------------+
+(33 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01446.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+(0 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 7  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      GRC      0.637 |
+  |      THA      0.219 |
+  |      MYS      0.043 |
+  |      ZAF      0.033 |
+  |      COL      0.032 |
+  |      LKA      0.027 |
+  |      ARG      0.009 |
+  +---------------------+
+(0 observations deleted)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_jucon_trends.pdf saved as PDF format
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/Fig_jucon_pvals.pdf saved as PDF format
+
+. postclose `T'
+
+. 
+. * --- Table 2 values ---------------------------------------------------------------------
+. use "$out/table2_values.dta", clear
+
+. format pre_rmspe %7.4f
+
+. format eff_2014 eff_2023 %7.3f
+
+. format joint_p %5.2f
+
+. display as result _newline "Table 2 values, 18-donor EIU-rule pool:"
+
+Table 2 values, 18-donor EIU-rule pool:
+
+. list indicator pre_rmspe eff_2014 eff_2023 joint_p n_placebos, noobs sep(0) abbreviate(24)
+
+  +----------------------------------------------------------------------------------+
+  |               indicator   pre_rmspe   eff_2014   eff_2023   joint_p   n_placebos |
+  |----------------------------------------------------------------------------------|
+  |               Polyarchy      0.0137     -0.082     -0.377      0.00           18 |
+  |       Liberal democracy      0.0117     -0.063     -0.335      0.00           18 |
+  |    Political corruption      0.0191      0.036      0.322      0.00           16 |
+  | Equality before the law      0.0090      0.009     -0.186      0.06           18 |
+  |  Freedom of association      0.0166     -0.008     -0.229      0.00           18 |
+  |   Freedom of expression      0.0064     -0.069     -0.401      0.00           17 |
+  |     Freedom of religion      0.1066     -0.580     -1.129      0.00           17 |
+  |        Equal protection      0.0125      0.030     -0.167      0.06           17 |
+  | Legislative constraints      0.0076     -0.026      0.030      0.00           17 |
+  |    Judicial constraints      0.0065      0.018     -0.064      0.17           18 |
+  +----------------------------------------------------------------------------------+
+
+. export excel using "$out/table2_values.xlsx", firstrow(variables) replace
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/table2_values.xlsx saved
+
+. 
+. display as result _newline "Done. Everything in $out"
+
+Done. Everything in /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results
+
+. log close
+      name:  <unnamed>
+       log:  /Users/ttufmi169d/Dropbox/Modi-Mania/Governance_Results/governance_results.log
+  log type:  text
+ closed on:  18 Sep 2026, 12:25:02
+--------------------------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,982 @@
+--------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/income_pol18.log
+  log type:  text
+ opened on:  19 Sep 2026, 07:28:25
+
+. 
+. * 17-donor pool + POL
+. global donors "CHN IDN BRA BGD PAK MEX VNM PHL THA TUR EGY KOR ETH ZAF ARG MMR COD POL"
+
+. global covs   "csh_g hc csh_x csh_i"
+
+. 
+. * --- load India + donors, 1984 to endyr ------------------------------------------
+. capture program drop load18
+
+. program define load18
+  1.     args endyr
+  2.     use "$data", clear
+  3.     gen byte keepme = iso3code == "IND"
+  4.     foreach c of global donors {
+  5.         replace keepme = 1 if iso3code == "`c'"
+  6.     }
+  7.     keep if keepme & year >= 1984 & year <= `endyr'
+  8.     egen id = group(iso3code)
+  9.     tsset id year
+ 10. end
+
+. 
+. * --- data check (Poland especially) -----------------------------------------------
+. load18 2023
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+. foreach c in IND $donors {
+  2.     quietly count if iso3code == "`c'"
+  3.     local n = r(N)
+  4.     quietly count if iso3code == "`c'" & ///
+>         (rgdppc >= . | csh_g >= . | hc >= . | csh_x >= . | csh_i >= .)
+  5.     if `n' == 0       display as error "`c': not in data"
+  6.     else if r(N) > 0  display as error "`c': `r(N)' country-years with missing data"
+  7.     else              display as text  "`c': ok"
+  8. }
+IND: ok
+CHN: ok
+IDN: ok
+BRA: ok
+BGD: ok
+PAK: ok
+MEX: ok
+VNM: ok
+PHL: ok
+THA: ok
+TUR: ok
+EGY: ok
+KOR: ok
+ETH: ok
+ZAF: ok
+ARG: ok
+MMR: ok
+COD: ok
+POL: ok
+
+. 
+. * --- estimate one model, print and save results ----------------------------------
+. capture program drop run18
+
+. program define run18
+  1.     args stub trper endyr pred
+  2. 
+.     load18 `endyr'
+  3.     quietly levelsof id if iso3code == "IND", local(tr)
+  4.     synth rgdppc `pred', trunit(`tr') trperiod(`trper') nested allopt ///
+>         keep("$out/keep_`stub'") replace
+  5. 
+.     load18 `endyr'
+  6.     synth_runner rgdppc `pred', trunit(`tr') trperiod(`trper') nested allopt
+  7.     local jp = e(pval_joint_post_std)
+  8.     local np = e(n_pl_used)
+  9.     local nt = e(n_pl)
+ 10.     matrix P = e(pvals_std)
+ 11. 
+.     use "$out/keep_`stub'", clear
+ 12.     keep _time _Y_treated _Y_synthetic
+ 13.     drop if _time == .
+ 14.     rename _time year
+ 15.     gen effect = _Y_treated - _Y_synthetic
+ 16.     gen pre2 = effect^2 if year < `trper'
+ 17.     quietly summarize pre2
+ 18.     local rmspe = sqrt(r(mean))
+ 19.     keep if year >= `trper'
+ 20.     gen lead = _n
+ 21.     gen pval = .
+ 22.     forvalues j = 1/`=colsof(P)' {
+ 23.         quietly replace pval = round(P[1,`j'], .01) in `j'
+ 24.     }
+ 25.     keep year lead effect pval
+ 26.     save "$out/pvals_`stub'", replace
+ 27. 
+.     display as result _newline "=== `stub' (18 donors): treatment `trper', 1984-`endyr' ==="
+ 28.     display as result "pre-treatment RMSPE = " %6.1f `rmspe' ///
+>         "   joint p (std) = " %5.2f `jp' "   placebos used = `np' of `nt'"
+ 29.     format effect %8.1f
+ 30.     list year effect pval, noobs sep(0)
+ 31. 
+.     * weights (Poland's weight is the number to watch)
+.     use "$out/keep_`stub'", clear
+ 32.     keep _Co_Number _W_Weight
+ 33.     drop if _Co_Number == . | _W_Weight < .001
+ 34.     rename _Co_Number id
+ 35.     tempfile w
+ 36.     save `w'
+ 37.     load18 `endyr'
+ 38.     keep id iso3code
+ 39.     duplicates drop
+ 40.     merge 1:1 id using `w', nogenerate keep(match)
+ 41.     gsort -_W_Weight
+ 42.     format _W_Weight %6.3f
+ 43.     list iso3code _W_Weight, noobs sep(0)
+ 44. end
+
+. 
+. * --- side-by-side: 17-donor (Income_Results) vs 18-donor (this run) ---------------
+. capture program drop compare18
+
+. program define compare18
+  1.     args stub
+  2.     use "$out17/pvals_`stub'", clear
+  3.     rename effect effect17
+  4.     rename pval   pval17
+  5.     merge 1:1 year using "$out/pvals_`stub'", nogenerate
+  6.     rename effect effect18
+  7.     rename pval   pval18
+  8.     gen diff = effect18 - effect17
+  9.     format effect17 effect18 diff %8.1f
+ 10.     display as result _newline "=== `stub': 17-donor vs 18-donor (with Poland) ==="
+ 11.     list year effect17 pval17 effect18 pval18 diff, noobs sep(0)
+ 12. end
+
+. 
+. ********************************************************************************
+. * RUN
+. ********************************************************************************
+. 
+. local main_pred "rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2001) rgdppc(2006) rgdppc(2011) $covs"
+
+. local lags ""
+
+. forvalues y = 1984/2013 {
+  2.     local lags `lags' rgdppc(`y')
+  3. }
+
+. 
+. run18 main    2014 2023 "`main_pred'"
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: rgdppc
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2001) rgdppc(2006) rgdppc(2011) csh_g hc csh_x csh_i
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  57.67797 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |           0
+        2 |        .313
+        3 |           0
+        4 |        .262
+        5 |           0
+        6 |           0
+        7 |        .363
+        8 |           0
+       10 |        .006
+       11 |           0
+       12 |           0
+       13 |        .056
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |           0
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+                  rgdppc(1986) |  1333.145   1385.937 
+                  rgdppc(1991) |  1597.099   1563.425 
+                  rgdppc(1996) |  1976.404   2006.035 
+                  rgdppc(2001) |  2422.656   2433.934 
+                  rgdppc(2006) |  3462.683   3448.669 
+                  rgdppc(2011) |  5113.885   5123.427 
+                         csh_g |  .1419144   .1498593 
+                            hc |   1.70224   1.619998 
+                         csh_x |   .041744   .0586373 
+                         csh_i |   .219645   .1970991 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+........x........| 19.27m elapsed. 
+
+Conducting inference: 5 steps, and 17 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 | -402.2409   .5882353          0 
+          c2 | -463.4367   .5882353          0 
+          c3 | -513.7736   .7058824          0 
+          c4 | -577.2926   .7647059          0 
+          c5 | -545.6524   .7647059   .0588235 
+          c6 | -646.8058   .7647059   .0588235 
+          c7 | -1222.731   .5882353          0 
+          c8 | -1104.543   .5294118   .0588235 
+          c9 | -1097.656   .7058824   .0588235 
+         c10 | -1095.492   .6470588   .0588235 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/pvals_main.dta saved
+
+=== main (18 donors): treatment 2014, 1984-2023 ===
+pre-treatment RMSPE =   60.0   joint p (std) =  0.06   placebos used = 17 of 17
+
+  +-----------------------+
+  | year    effect   pval |
+  |-----------------------|
+  | 2014    -402.2      0 |
+  | 2015    -463.4      0 |
+  | 2016    -513.8      0 |
+  | 2017    -577.3      0 |
+  | 2018    -545.7    .06 |
+  | 2019    -646.8    .06 |
+  | 2020   -1222.7      0 |
+  | 2021   -1104.5    .06 |
+  | 2022   -1097.7    .06 |
+  | 2023   -1095.5    .06 |
+  +-----------------------+
+(35 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01561.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 5  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ETH      0.363 |
+  |      BGD      0.313 |
+  |      CHN      0.262 |
+  |      PAK      0.056 |
+  |      KOR      0.006 |
+  +---------------------+
+
+. run18 singh   2004 2013 "rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2001) rgdppc(2003) $covs"
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,769 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2013
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: rgdppc
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: rgdppc(1986) rgdppc(1991) rgdppc(1996) rgdppc(2001) rgdppc(2003) csh_g hc csh_x csh_i
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  32.75087 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |           0
+        2 |        .442
+        3 |           0
+        4 |        .261
+        5 |           0
+        6 |           0
+        7 |        .217
+        8 |           0
+       10 |           0
+       11 |           0
+       12 |           0
+       13 |        .041
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |        .038
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+                  rgdppc(1986) |  1333.145   1375.401 
+                  rgdppc(1991) |  1597.099   1573.576 
+                  rgdppc(1996) |  1976.404   1994.179 
+                  rgdppc(2001) |  2422.656   2414.554 
+                  rgdppc(2003) |  2674.588   2681.427 
+                         csh_g |  .1576332   .1597698 
+                            hc |   1.58646   1.593135 
+                         csh_x |  .0331793   .0465859 
+                         csh_i |   .173432   .1731173 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,769 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2013
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+.................| 3.15m elapsed. 
+
+Conducting inference: 5 steps, and 18 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 | -29.00737   .9444444   .7222222 
+          c2 |  -28.4372          1   .8333333 
+          c3 |  20.29233          1   .9444444 
+          c4 |  30.25467          1   .8888889 
+          c5 | -169.5533          1   .2222222 
+          c6 | -149.5249          1   .3888889 
+          c7 | -65.91901          1   .7222222 
+          c8 | -198.7376   .9444444   .3888889 
+          c9 | -339.8749   .8333333   .2777778 
+         c10 | -475.1063   .7777778   .2777778 
+(0 observations deleted)
+(10 missing values generated)
+(20 observations deleted)
+(10 missing values generated)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/pvals_singh.dta saved
+
+=== singh (18 donors): treatment 2004, 1984-2013 ===
+pre-treatment RMSPE =   32.7   joint p (std) =  0.33   placebos used = 18 of 18
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2004    -29.0    .72 |
+  | 2005    -28.4    .83 |
+  | 2006     20.3    .94 |
+  | 2007     30.3    .89 |
+  | 2008   -169.6    .22 |
+  | 2009   -149.5    .39 |
+  | 2010    -65.9    .72 |
+  | 2011   -198.7    .39 |
+  | 2012   -339.9    .28 |
+  | 2013   -475.1    .28 |
+  +----------------------+
+(25 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01561.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,769 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2013
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(551 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 5  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      BGD      0.442 |
+  |      CHN      0.261 |
+  |      ETH      0.217 |
+  |      PAK      0.041 |
+  |      VNM      0.038 |
+  +---------------------+
+
+. run18 alllags 2014 2023 "`lags'"
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+--------------------------------------------------------------------------------------------------------------------------------
+Synthetic Control Method for Comparative Case Studies
+--------------------------------------------------------------------------------------------------------------------------------
+
+First Step: Data Setup
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Data Setup successful
+--------------------------------------------------------------------------------------------------------------------------------
+                Treated Unit: 9
+               Control Units: 1 2 3 4 5 6 7 8 10 11 12 13 14 15 16 17 18 19
+--------------------------------------------------------------------------------------------------------------------------------
+          Dependent Variable: rgdppc
+  MSPE minimized for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+Results obtained for periods: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020 2021
+                              2022 2023
+--------------------------------------------------------------------------------------------------------------------------------
+                  Predictors: rgdppc(1984) rgdppc(1985) rgdppc(1986) rgdppc(1987) rgdppc(1988) rgdppc(1989) rgdppc(1990)
+                              rgdppc(1991) rgdppc(1992) rgdppc(1993) rgdppc(1994) rgdppc(1995) rgdppc(1996) rgdppc(1997)
+                              rgdppc(1998) rgdppc(1999) rgdppc(2000) rgdppc(2001) rgdppc(2002) rgdppc(2003) rgdppc(2004)
+                              rgdppc(2005) rgdppc(2006) rgdppc(2007) rgdppc(2008) rgdppc(2009) rgdppc(2010) rgdppc(2011)
+                              rgdppc(2012) rgdppc(2013)
+--------------------------------------------------------------------------------------------------------------------------------
+Unless period is specified
+predictors are averaged over: 1984 1985 1986 1987 1988 1989 1990 1991 1992 1993 1994 1995 1996 1997 1998 1999 2000 2001 2002
+                              2003 2004 2005 2006 2007 2008 2009 2010 2011 2012 2013
+--------------------------------------------------------------------------------------------------------------------------------
+
+Second Step: Run Optimization
+--------------------------------------------------------------------------------------------------------------------------------
+Nested optimization requested
+Starting nested optimization module
+Optimization done
+Allopt requested. This may take a while
+Restarting nested optimization module (search method)
+done
+Restarting nested optimization module (equal method)
+done
+--------------------------------------------------------------------------------------------------------------------------------
+Optimization done
+--------------------------------------------------------------------------------------------------------------------------------
+
+Third Step: Obtain Results
+--------------------------------------------------------------------------------------------------------------------------------
+Loss: Root Mean Squared Prediction Error
+
+---------------------
+   RMSPE |  47.42803 
+---------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Unit Weights:
+
+-----------------------
+    Co_No | Unit_Weight
+----------+------------
+        1 |           0
+        2 |        .079
+        3 |           0
+        4 |        .153
+        5 |           0
+        6 |           0
+        7 |        .471
+        8 |           0
+       10 |        .015
+       11 |           0
+       12 |        .023
+       13 |        .054
+       14 |           0
+       15 |           0
+       16 |           0
+       17 |           0
+       18 |        .205
+       19 |           0
+-----------------------
+--------------------------------------------------------------------------------------------------------------------------------
+Predictor Balance:
+
+------------------------------------------------------
+                               |   Treated  Synthetic 
+-------------------------------+----------------------
+                  rgdppc(1984) |  1317.242   1327.662 
+                  rgdppc(1985) |  1306.063   1393.725 
+                  rgdppc(1986) |  1333.145   1402.038 
+                  rgdppc(1987) |  1372.902   1424.897 
+                  rgdppc(1988) |  1449.677   1454.139 
+                  rgdppc(1989) |  1517.375   1452.167 
+                  rgdppc(1990) |  1570.757   1531.037 
+                  rgdppc(1991) |  1597.099   1565.517 
+                  rgdppc(1992) |  1640.444   1602.254 
+                  rgdppc(1993) |  1703.865   1693.254 
+                  rgdppc(1994) |  1764.525   1762.252 
+                  rgdppc(1995) |  1865.296   1896.423 
+                  rgdppc(1996) |  1976.404   2014.759 
+                  rgdppc(1997) |  2028.984   2100.686 
+                  rgdppc(1998) |  2156.507   2101.437 
+                  rgdppc(1999) |  2257.388   2199.791 
+                  rgdppc(2000) |  2331.091   2299.511 
+                  rgdppc(2001) |  2422.656    2426.54 
+                  rgdppc(2002) |  2508.943   2532.899 
+                  rgdppc(2003) |  2674.588   2658.465 
+                  rgdppc(2004) |  2864.098   2895.854 
+                  rgdppc(2005) |  3157.962   3185.455 
+                  rgdppc(2006) |  3462.683   3426.373 
+                  rgdppc(2007) |  3836.877   3764.332 
+                  rgdppc(2008) |  3892.355   3992.502 
+                  rgdppc(2009) |  4246.308   4259.487 
+                  rgdppc(2010) |  4801.292   4737.157 
+                  rgdppc(2011) |  5113.885   5072.998 
+                  rgdppc(2012) |  5381.067   5382.647 
+                  rgdppc(2013) |  5473.419   5534.329 
+------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+Estimating the treatment effects
+Estimating the possible placebo effects (one set for each of the 1 treatment periods)
+|                | Total: 18
+........x........| 23.97m elapsed. 
+
+Conducting inference: 5 steps, and 17 placebo averages
+Step 1... Finished
+Step 2... Finished
+Step 3... Finished
+Step 4... Finished
+Step 5... Finished
+
+Post-treatment results: Effects, p-values, standardized p-values
+
+             | estimates      pvals  pvals_std 
+-------------+--------------------------------
+          c1 | -254.4832   .8823529          0 
+          c2 | -286.4899   .7647059   .0588235 
+          c3 | -338.7255   .7647059   .0588235 
+          c4 |  -441.737   .7647059   .1176471 
+          c5 | -383.5769   .8823529   .0588235 
+          c6 | -424.8048   .8823529   .0588235 
+          c7 | -962.4937   .5882353   .0588235 
+          c8 | -631.0842   .7058824   .0588235 
+          c9 | -642.0525   .8235294   .0588235 
+         c10 | -592.7087   .6470588   .0588235 
+(0 observations deleted)
+(10 missing values generated)
+(30 observations deleted)
+(10 missing values generated)
+(file /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/pvals_alllags.dta not found)
+file /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/pvals_alllags.dta saved
+
+=== alllags (18 donors): treatment 2014, 1984-2023 ===
+pre-treatment RMSPE =   47.4   joint p (std) =  0.06   placebos used = 17 of 17
+
+  +----------------------+
+  | year   effect   pval |
+  |----------------------|
+  | 2014   -254.5      0 |
+  | 2015   -286.5    .06 |
+  | 2016   -338.7    .06 |
+  | 2017   -441.7    .12 |
+  | 2018   -383.6    .06 |
+  | 2019   -424.8    .06 |
+  | 2020   -962.5    .06 |
+  | 2021   -631.1    .06 |
+  | 2022   -642.1    .06 |
+  | 2023   -592.7    .06 |
+  +----------------------+
+(33 observations deleted)
+file /var/folders/n2/g05j986d0tv42b50_gpfrqfr0000gn/T//S_01561.000001 saved as .dta format
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(53 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(74 real changes made)
+(10,579 observations deleted)
+
+Panel variable: id (strongly balanced)
+ Time variable: year, 1984 to 2023
+         Delta: 1 unit
+
+Duplicates in terms of all variables
+
+(741 observations deleted)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                 7  
+    -----------------------------------------
+
+  +---------------------+
+  | iso3code   _W_Wei~t |
+  |---------------------|
+  |      ETH      0.471 |
+  |      VNM      0.205 |
+  |      CHN      0.153 |
+  |      BGD      0.079 |
+  |      PAK      0.054 |
+  |      MMR      0.023 |
+  |      KOR      0.015 |
+  +---------------------+
+
+. 
+. compare18 main
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                10  
+    -----------------------------------------
+
+=== main: 17-donor vs 18-donor (with Poland) ===
+
+  +------------------------------------------------------+
+  | year   effect17   pval17   effect18   pval18    diff |
+  |------------------------------------------------------|
+  | 2014     -380.5        0     -402.2        0   -21.7 |
+  | 2015     -442.3        0     -463.4        0   -21.2 |
+  | 2016     -493.2        0     -513.8        0   -20.5 |
+  | 2017     -556.8        0     -577.3        0   -20.5 |
+  | 2018     -521.8      .06     -545.7      .06   -23.8 |
+  | 2019     -620.4      .06     -646.8      .06   -26.4 |
+  | 2020    -1196.7        0    -1222.7        0   -26.0 |
+  | 2021    -1079.9      .06    -1104.5      .06   -24.6 |
+  | 2022    -1071.9      .06    -1097.7      .06   -25.8 |
+  | 2023    -1071.7      .06    -1095.5      .06   -23.7 |
+  +------------------------------------------------------+
+
+. compare18 singh
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                10  
+    -----------------------------------------
+
+=== singh: 17-donor vs 18-donor (with Poland) ===
+
+  +------------------------------------------------------+
+  | year   effect17   pval17   effect18   pval18    diff |
+  |------------------------------------------------------|
+  | 2004      -32.6      .63      -29.0      .72     3.6 |
+  | 2005      -28.4      .81      -28.4      .83    -0.0 |
+  | 2006      -17.0        1       20.3      .94    37.3 |
+  | 2007      -11.2        1       30.3      .89    41.4 |
+  | 2008     -263.0      .19     -169.6      .22    93.4 |
+  | 2009     -262.2      .25     -149.5      .39   112.7 |
+  | 2010     -275.8      .31      -65.9      .72   209.9 |
+  | 2011     -417.4      .31     -198.7      .39   218.7 |
+  | 2012     -601.7      .25     -339.9      .28   261.8 |
+  | 2013     -712.4      .19     -475.1      .28   237.3 |
+  +------------------------------------------------------+
+
+. compare18 alllags
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                                10  
+    -----------------------------------------
+
+=== alllags: 17-donor vs 18-donor (with Poland) ===
+
+  +-----------------------------------------------------+
+  | year   effect17   pval17   effect18   pval18   diff |
+  |-----------------------------------------------------|
+  | 2014     -254.5        0     -254.5        0    0.0 |
+  | 2015     -286.5      .06     -286.5      .06    0.0 |
+  | 2016     -338.7      .06     -338.7      .06    0.0 |
+  | 2017     -441.7      .12     -441.7      .12    0.0 |
+  | 2018     -383.6      .06     -383.6      .06    0.0 |
+  | 2019     -424.8      .06     -424.8      .06    0.0 |
+  | 2020     -962.5      .06     -962.5      .06    0.0 |
+  | 2021     -631.1      .06     -631.1      .06    0.0 |
+  | 2022     -642.1      .06     -642.1      .06    0.0 |
+  | 2023     -592.7      .06     -592.7      .06    0.0 |
+  +-----------------------------------------------------+
+
+. 
+. display as result _newline "Done. Results in $out/income_pol18.log"
+
+Done. Results in /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/income_pol18.log
+
+. log close
+      name:  <unnamed>
+       log:  /Users/ttufmi169d/Dropbox/Modi-Mania/Income_Pol18/income_pol18.log
+  log type:  text
+ closed on:  19 Sep 2026, 08:21:56
+--------------------------------------------------------------------------------------------------------------------------------
